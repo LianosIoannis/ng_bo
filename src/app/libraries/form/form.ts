@@ -12,7 +12,7 @@ import { FormSelect } from "./form-select/form-select";
 	templateUrl: "./form.html",
 })
 export class Form {
-	inputOptions = input.required<FormInputOption[]>();
+	inputOptions = input<FormInputOption[]>([]);
 	submitLabel = input<string>("Submit");
 
 	formModel = linkedSignal(() => {
