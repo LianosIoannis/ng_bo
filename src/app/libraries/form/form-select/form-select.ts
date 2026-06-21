@@ -8,6 +8,7 @@ import type { SelectOption, SelectValueResult } from "../../../models/form.model
 	selector: "form-select",
 	imports: [FormsModule, NgSelectComponent, NgMultiLabelTemplateDirective, NgOptionTemplateDirective],
 	templateUrl: "./form-select.html",
+  styleUrl: "./form-select.css",
 })
 export class FormSelect implements FormValueControl<SelectValueResult> {
 	readonly value = model.required<SelectValueResult>();

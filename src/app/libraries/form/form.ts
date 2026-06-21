@@ -5,6 +5,7 @@ import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
 import { FormInput } from "./form-input/form-input";
 import { FormSelect } from "./form-select/form-select";
+import { EditorLang } from "../../models/editor-lang.model";
 
 @Component({
 	selector: "app-form",
@@ -72,6 +73,10 @@ export class Form {
 	selectValueField(option: FormInputOption) {
 		return this.inputField(option) as Field<SelectValueResult>;
 	}
+
+  selectedLanguage(option: FormInputOption) {
+    return this.optionsForm[option.name].operator().value() as EditorLang;
+  }
 
 	operatorOptions(option: FormInputOption) {
 		return option.operators.map((operator) => ({
