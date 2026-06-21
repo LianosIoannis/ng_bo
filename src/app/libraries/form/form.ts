@@ -1,7 +1,7 @@
 import { Component, computed, input, linkedSignal } from "@angular/core";
-import { disabled, type Field, FormField, form, required } from "@angular/forms/signals";
+import { disabled, type Field, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import type { EditorLang } from "../../models/editor-lang.model";
-import type { FormInputOption, FormModel, Operator, SelectValueResult } from "../../models/form.models";
+import type { FormInputOption, FormModel, FormResult, Operator, SelectValueResult } from "../../models/form.models";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
 import { FormInput } from "./form-input/form-input";
@@ -9,7 +9,7 @@ import { FormSelect } from "./form-select/form-select";
 
 @Component({
 	selector: "app-form",
-	imports: [FormField, FormSelect, FormInput, FormCheckbox, FormEditor],
+	imports: [FormRoot, FormField, FormSelect, FormInput, FormCheckbox, FormEditor],
 	templateUrl: "./form.html",
 })
 export class Form {
@@ -107,5 +107,7 @@ export class Form {
 		return this.operatorOptionsMap().find((item) => item.name === option.name)?.operators ?? [];
 	}
 
-	submitForm() {}
+	submitForm(): FormResult {
+    return this.formModel();
+  }
 }
