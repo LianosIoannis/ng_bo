@@ -1,4 +1,4 @@
-import { Component, input, linkedSignal } from "@angular/core";
+import { Component, computed, input, linkedSignal } from "@angular/core";
 import { disabled, type Field, FormField, form, required } from "@angular/forms/signals";
 import type { EditorLang } from "../../models/editor-lang.model";
 import type { FormInputOption, FormModel, Operator, SelectValueResult } from "../../models/form.models";
@@ -15,6 +15,16 @@ import { FormSelect } from "./form-select/form-select";
 export class Form {
 	inputOptions = input<FormInputOption[]>([]);
 	submitLabel = input<string>("Submit");
+
+	operatorOptionsMap = computed(() => {
+		return this.inputOptions().map((option) => ({
+			name: option.name,
+			operators: option.operators.map((operator) => ({
+				label: operator as string,
+				value: operator,
+			})),
+		}));
+	});
 
 	formModel = linkedSignal(() => {
 		const model: FormModel = {};
@@ -94,10 +104,7 @@ export class Form {
 	}
 
 	operatorOptions(option: FormInputOption) {
-		return option.operators.map((operator) => ({
-			label: operator,
-			value: operator,
-		}));
+		return this.operatorOptionsMap().find((item) => item.name === option.name)?.operators ?? [];
 	}
 
 	submitForm() {}
