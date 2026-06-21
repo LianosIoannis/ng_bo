@@ -1,0 +1,12 @@
+<main class="mx-auto grid max-w-5xl gap-6 p-6">
+  <header class="grid gap-2">
+    <h1 class="text-2xl font-semibold text-slate-950">Form test</h1>
+    <p class="max-w-2xl text-sm text-slate-600">
+      Mock fields covering text, number ranges, selects, multi-selects, booleans, code, required, and readonly states.
+    </p>
+  </header>
+
+  <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <app-form [inputOptions]="formOptions()" submitLabel="Apply filters" />
+  </section>
+</main>
