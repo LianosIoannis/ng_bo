@@ -1,11 +1,11 @@
 import { Component, input, linkedSignal } from "@angular/core";
 import { disabled, type Field, FormField, form, required } from "@angular/forms/signals";
+import type { EditorLang } from "../../models/editor-lang.model";
 import type { FormInputOption, FormModel, Operator, SelectValueResult } from "../../models/form.models";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
 import { FormInput } from "./form-input/form-input";
 import { FormSelect } from "./form-select/form-select";
-import { EditorLang } from "../../models/editor-lang.model";
 
 @Component({
 	selector: "app-form",
@@ -74,9 +74,24 @@ export class Form {
 		return this.inputField(option) as Field<SelectValueResult>;
 	}
 
-  selectedLanguage(option: FormInputOption) {
-    return this.optionsForm[option.name].operator().value() as EditorLang;
-  }
+	selectedLanguage(option: FormInputOption) {
+		return this.optionsForm[option.name].operator().value() as EditorLang;
+	}
+
+	inputType(option: FormInputOption): "text" | "number" | "date" | "datetime-local" | "time" {
+		switch (option.type) {
+			case "number":
+				return "number";
+			case "date":
+				return "date";
+			case "datetime":
+				return "datetime-local";
+			case "time":
+				return "time";
+			default:
+				return "text";
+		}
+	}
 
 	operatorOptions(option: FormInputOption) {
 		return option.operators.map((operator) => ({

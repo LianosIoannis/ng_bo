@@ -12,7 +12,7 @@ export class FormInput implements FormValueControl<string | number | null> {
 	readonly required = input(false);
 	readonly touch = output<void>();
 
-	readonly type = input<"date" | "datetime-local" | "time">("date");
+	readonly type = input<"text" | "number" | "date" | "datetime-local" | "time">("text");
 
 
 	protected updateValue(event: Event): void {

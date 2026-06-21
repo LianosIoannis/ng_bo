@@ -11,8 +11,8 @@
 
         @if (isRangeOperator(optionsForm[option.name].operator().value())) {
           <div class="grid gap-2 md:grid-cols-2">
-            <form-input [formField]="inputValueField(option)" />
-            <form-input [formField]="inputValueToField(option)" />
+            <form-input [formField]="inputValueField(option)" [type]="inputType(option)" />
+            <form-input [formField]="inputValueToField(option)" [type]="inputType(option)" />
           </div>
         } @else {
           @switch (option.type) {
@@ -29,7 +29,7 @@
               <form-select [formField]="selectValueField(option)" [options]="option.options"
                 [multiple]="option.multiple ?? false" />
               } @else {
-                <form-input [formField]="inputValueField(option)" />
+                <form-input [formField]="inputValueField(option)" [type]="inputType(option)" />
               }
             }
           }

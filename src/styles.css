@@ -45,3 +45,8 @@
   align-items: center;
   padding-top: 0;
 }
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-placeholder {
+  padding-bottom: 0px;
+  position: static;
+}
