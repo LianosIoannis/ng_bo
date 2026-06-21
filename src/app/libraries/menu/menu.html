@@ -1,0 +1,63 @@
+<div class="w-full h-full flex flex-col items-stretch bg-linear-to-b from-slate-900 to-slate-800 text-slate-100">
+  <!-- TOP -->
+  <div
+    class="h-40 border-b border-white/10 bg-slate-900/80 backdrop-blur-md flex flex-col items-stretch justify-between">
+    <!-- profile row -->
+    <div class="flex-2 px-4 pt-4 pb-2 flex items-start justify-start gap-3">
+      <div
+        class="size-10 rounded-full bg-slate-700/60 ring-1 ring-white/10 grid place-items-center hover:bg-slate-500/60"
+        (click)="profileClicked()">
+        <fa-icon [icon]="'user'" class="text-slate-200 text-base" [fixedWidth]="true"></fa-icon>
+      </div>
+      <div class="leading-tight">
+        <div class="font-semibold">{{ menuData().mainHeaderText }}</div>
+        <div class="text-xs text-slate-300/80">{{ menuData().subHeaderText }}</div>
+      </div>
+    </div>
+
+    <!-- search row -->
+    <div class="flex-1 flex items-center justify-center px-5 py-2">
+      <div class="relative flex-1">
+        <label class="sr-only" for="menu-search">Search</label>
+
+        <!-- FA search icon -->
+        <fa-icon [icon]="'search'"
+          class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"
+          [fixedWidth]="true">
+        </fa-icon>
+
+        <input id="menu-search" type="search"
+          class="w-full pl-9 pr-2 h-8 rounded-lg bg-white/90 text-slate-900 placeholder-slate-500 outline-none text-sm ring-1 ring-white/20 focus-visible:ring-2 focus-visible:ring-sky-400 transition-shadow"
+          [(ngModel)]="filter" placeholder="Search…" autocomplete="off" spellcheck="false" enterkeyhint="search"
+          inputmode="search" />
+      </div>
+    </div>
+  </div>
+
+  <!-- MIDDLE (scroll area) -->
+  <div class="flex-1 min-h-0 w-full flex flex-col gap-y-3 select-none p-2 pb-5 overflow-auto bg-slate-900/20">
+    @for (menuItem of filteredItems(); track menuItem.id) {
+    <menu-item [menuItem]="menuItem" (onItemClicked)="itemClicked($event)" [filtered]="filter() !== ''">
+    </menu-item>
+    } @empty {
+    <div class="text-sm text-white/70 p-3">No results</div>
+    }
+  </div>
+
+  <!-- BOTTOM -->
+  <div class="h-14 border-t border-white/10 bg-slate-900/80 backdrop-blur-md">
+    <div class="px-3 py-2 h-full flex items-center justify-between">
+      <button type="button"
+        class="size-8 flex items-center justify-center rounded-lg bg-rose-600 text-white hover:bg-rose-500 active:scale-95 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+        aria-label="Log out" (click)="logoutClicked()">
+        <fa-icon [icon]="'power-off'"></fa-icon>
+      </button>
+
+      <button type="button"
+        class="size-8 flex items-center justify-center rounded-lg bg-slate-800/70 ring-1 ring-white/10 hover:bg-slate-700 active:scale-95 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+        aria-label="Collapse sidebar" (click)="closeClicked()">
+        <fa-icon [icon]="'chevron-left'" class="text-slate-200"></fa-icon>
+      </button>
+    </div>
+  </div>
+</div>

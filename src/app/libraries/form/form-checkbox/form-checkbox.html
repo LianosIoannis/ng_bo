@@ -1,0 +1,12 @@
+<label class="inline-flex min-h-10 items-center gap-2 text-sm text-slate-950">
+  <input
+    class="size-4 rounded border border-slate-300 accent-indigo-600 shadow-sm shadow-slate-200 transition focus:ring-4 focus:ring-indigo-100 focus:outline-none disabled:cursor-not-allowed"
+    [name]="name()" type="checkbox" [checked]="value() ?? false" [readOnly]="readonly()" [required]="required()"
+    (change)="updateValue($event)" (blur)="markTouched()" />
+
+  @if (label()) {
+  <span [class.text-slate-600]="readonly()">{{
+    label()
+    }}</span>
+  }
+</label>

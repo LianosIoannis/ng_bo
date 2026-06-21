@@ -1,0 +1,4 @@
+<input
+  class="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm shadow-slate-200 transition hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 read-only:bg-slate-50 read-only:text-slate-600 invalid:border-rose-500 invalid:focus:border-rose-500 invalid:focus:ring-rose-100"
+  [name]="name()" [type]="type()" [value]="value() ?? ''" [readOnly]="readonly()" [required]="required()"
+  (input)="updateValue($event)" (blur)="markTouched()" />

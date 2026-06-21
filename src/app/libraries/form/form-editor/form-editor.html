@@ -1,0 +1,7 @@
+<div
+  class="min-h-32 h-full w-full overflow-hidden rounded-md border border-slate-300 bg-slate-950 transition focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20"
+  [class.border-red-600]="required() && !value()" [class.focus-within:border-red-600]="required() && !value()"
+  [class.focus-within:ring-red-600]="required() && !value()">
+  <editor [value]="value() ?? ''" [language]="language()" [readonly]="readonly()"
+    (valueChange)="updateValue($event)" (blur)="markTouched()" />
+</div>

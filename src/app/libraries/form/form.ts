@@ -1,0 +1,84 @@
+import { Component, input, linkedSignal } from "@angular/core";
+import { disabled, type Field, FormField, form, required } from "@angular/forms/signals";
+import type { FormInputOption, FormModel, Operator, SelectValueResult } from "../../models/form.models";
+import { FormCheckbox } from "./form-checkbox/form-checkbox";
+import { FormEditor } from "./form-editor/form-editor";
+import { FormInput } from "./form-input/form-input";
+import { FormSelect } from "./form-select/form-select";
+
+@Component({
+	selector: "app-form",
+	imports: [FormField, FormSelect, FormInput, FormCheckbox, FormEditor],
+	templateUrl: "./form.html",
+})
+export class Form {
+	inputOptions = input.required<FormInputOption[]>();
+	submitLabel = input<string>("Submit");
+
+	formModel = linkedSignal(() => {
+		const model: FormModel = {};
+
+		for (const option of this.inputOptions()) {
+			model[option.name] = {
+				operator: option.defaultOperator ?? option.operators?.[0] ?? ("equals" as Operator),
+				value: option.defaultValue ?? (option.multiple ? [] : null),
+				valueTo: null,
+			};
+		}
+
+		return model;
+	});
+
+	optionsForm = form(this.formModel, (path) => {
+		for (const option of this.inputOptions()) {
+			const field = path[option.name];
+
+			if (option.required) {
+				required(field.value);
+			}
+
+			if (option.readonly) {
+				disabled(field.value);
+				disabled(field.operator);
+				disabled(field.valueTo);
+			}
+		}
+	});
+
+	isRangeOperator(operator: Operator): boolean {
+		return operator === "between" || operator === "notBetween";
+	}
+
+	inputField(option: FormInputOption) {
+		return this.optionsForm[option.name].value;
+	}
+
+	inputValueField(option: FormInputOption) {
+		return this.inputField(option) as Field<string | number | null>;
+	}
+
+	inputValueToField(option: FormInputOption) {
+		return this.optionsForm[option.name].valueTo as Field<string | number | null>;
+	}
+
+	booleanValueField(option: FormInputOption) {
+		return this.inputField(option) as Field<boolean | null>;
+	}
+
+	codeValueField(option: FormInputOption) {
+		return this.inputField(option) as Field<string | null>;
+	}
+
+	selectValueField(option: FormInputOption) {
+		return this.inputField(option) as Field<SelectValueResult>;
+	}
+
+	operatorOptions(option: FormInputOption) {
+		return option.operators.map((operator) => ({
+			label: operator,
+			value: operator,
+		}));
+	}
+
+	submitForm() {}
+}

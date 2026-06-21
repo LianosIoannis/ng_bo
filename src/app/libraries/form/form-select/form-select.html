@@ -1,0 +1,20 @@
+<ng-select class="mt-1 block text-sm" bindLabel="label" bindValue="value" [items]="options()" [multiple]="multiple()"
+  [closeOnSelect]="!multiple()" [clearable]="multiple() ? false : allowClear() && !required()" [searchable]="true"
+  [clearSearchOnAdd]="!multiple()" [readonly]="readonly()" [name]="name()" [ngModel]="value()"
+  (ngModelChange)="updateValue($event)" (blur)="markTouched()"
+  [placeholder]="placeholder() || (multiple() ? 'Select options' : 'Select option')">
+  @if (multiple()) {
+  <ng-template ng-multi-label-tmp>
+    <span class="truncate">{{ selectedLabel() }}</span>
+  </ng-template>
+
+  <ng-template ng-option-tmp let-item="item">
+    <div class="flex items-center gap-2">
+      <input
+        class="size-4 rounded border border-slate-300 accent-indigo-600 focus:ring-4 focus:ring-indigo-100 focus:outline-none"
+        type="checkbox" [checked]="isSelected(item)" tabindex="-1" aria-hidden="true" />
+      <span class="truncate">{{ item.label }}</span>
+    </div>
+  </ng-template>
+  }
+</ng-select>

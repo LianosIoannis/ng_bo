@@ -1,0 +1,48 @@
+<form class="grid gap-4" (submit)="submitForm()">
+  @for (option of inputOptions(); track option.name) {
+    <div class="grid gap-2">
+      <label class="text-sm font-medium text-slate-950" [attr.for]="option.name">
+        {{ option.label }}
+      </label>
+
+      <div class="grid gap-2 md:grid-cols-[minmax(10rem,14rem)_1fr]">
+        <form-select [formField]="optionsForm[option.name].operator" [options]="operatorOptions(option)"
+          [allowClear]="false" />
+
+        @if (isRangeOperator(optionsForm[option.name].operator().value())) {
+          <div class="grid gap-2 md:grid-cols-2">
+            <form-input [formField]="inputValueField(option)" />
+            <form-input [formField]="inputValueToField(option)" />
+          </div>
+        } @else {
+          @switch (option.type) {
+            @case ("boolean") {
+              <form-checkbox [formField]="booleanValueField(option)" />
+            }
+
+            @case ("code") {
+              <form-editor [formField]="codeValueField(option)" />
+            }
+
+            @default {
+              @if (option.options?.length) {
+              <form-select [formField]="selectValueField(option)" [options]="option.options"
+                [multiple]="option.multiple ?? false" />
+              } @else {
+                <form-input [formField]="inputValueField(option)" />
+              }
+            }
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <div class="flex justify-end">
+    <button
+      class="min-h-10 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-600/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-300"
+      type="submit">
+      {{ submitLabel() }}
+    </button>
+  </div>
+</form>
