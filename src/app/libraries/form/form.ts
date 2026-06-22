@@ -108,7 +108,7 @@ export class Form {
 	}
 
 	submitForm(): FormResult {
-    const result = this.formModel();
-    return result;
-  }
+		const result = this.formModel();
+		return result;
+	}
 }
