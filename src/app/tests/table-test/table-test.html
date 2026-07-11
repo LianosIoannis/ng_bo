@@ -7,6 +7,6 @@
   </header>
 
   <section class="h-128 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-    <agtable [gridOptions]="gridOptions" />
+    <agtable [gridOptions]="gridOptions" (rowClicked)="onRowClicked($event)" />
   </section>
 </main>

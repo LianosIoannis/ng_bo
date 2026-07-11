@@ -1,5 +1,5 @@
 import { Component } from "@angular/core";
-import type { GridOptions } from "ag-grid-community";
+import type { GridOptions, RowClickedEvent } from "ag-grid-community";
 import { Agtable } from "../../libraries/agtable/agtable";
 
 interface OrderRow {
@@ -54,4 +54,8 @@ export class TableTest {
 		paginationPageSizeSelector: [10, 20, 50, 100],
 		paginationPageSize: 10,
 	};
+
+  onRowClicked(row: RowClickedEvent<OrderRow>): void {
+    console.log("Row clicked:", row.data);
+  }
 }

@@ -1,6 +1,6 @@
 import { Component, signal } from "@angular/core";
 import { Form } from "../../libraries/form/form";
-import type { FormInputOption } from "../../models/form.models";
+import type { FormInputOption, FormResult } from "../../models/form.models";
 
 @Component({
 	selector: "app-form-test",
@@ -79,4 +79,8 @@ export class FormTest {
 			readonly: true,
 		},
 	]);
+
+  onFormResult(result: FormResult): void {
+    console.log("Form result:", result);
+  }
 }
