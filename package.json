@@ -22,6 +22,7 @@
     "@fortawesome/free-regular-svg-icons": "^7.2.0",
     "@fortawesome/free-solid-svg-icons": "^7.2.0",
     "@ng-select/ng-select": "^23.0.1",
+    "ag-grid-angular": "^36.0.0",
     "monaco-editor": "^0.55.1",
     "rxjs": "~7.8.0",
     "sql-formatter": "^15.8.1",
