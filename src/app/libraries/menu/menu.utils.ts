@@ -10,7 +10,7 @@ export function sortMenuItems(menuData: MenuItemModel[]): MenuItemModel[] {
 		})
 		.map(({ menuItem }) => ({
 			...menuItem,
-			items: menuItem.isFolder ? sortMenuItems(menuItem.items) : menuItem.items,
+			items: menuItem.kind === "FOLDER" ? sortMenuItems(menuItem.items) : menuItem.items,
 		}));
 }
 
@@ -18,13 +18,13 @@ export function menuDataFiltered(menuData: MenuItemModel[], filter: string) {
 	const filterToLowerCase = filter.toLowerCase();
 
 	return menuData.reduce((result: MenuItemModel[], currMenuItem: MenuItemModel) => {
-		const filteredKids = currMenuItem.isFolder ? menuDataFiltered(currMenuItem.items, filter) : [];
+		const filteredKids = currMenuItem.kind === "FOLDER" ? menuDataFiltered(currMenuItem.items, filter) : [];
 
 		const itemIncludesFilter = (item: MenuItemModel): boolean => {
 			return (
 				filterToLowerCase === "" ||
-				(!item.isFolder && item.text.toLowerCase().includes(filterToLowerCase)) ||
-				(item.isFolder && item.items.some((item) => itemIncludesFilter(item))) ||
+				(item.kind === "ITEM" && item.text.toLowerCase().includes(filterToLowerCase)) ||
+				(item.kind === "FOLDER" && item.items.some((item) => itemIncludesFilter(item))) ||
 				false
 			);
 		};
@@ -34,7 +34,7 @@ export function menuDataFiltered(menuData: MenuItemModel[], filter: string) {
 		if (matches || filteredKids.length) {
 			result.push({
 				...currMenuItem,
-				...(currMenuItem.isFolder ? { items: filteredKids } : {}),
+				...(currMenuItem.kind === "FOLDER" ? { items: filteredKids } : {}),
 			});
 		}
 

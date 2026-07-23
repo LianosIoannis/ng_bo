@@ -1,9 +1,11 @@
+export type MenuItemKind = "FOLDER" | "ITEM";
+
 export type MenuItemModel = {
 	id: string;
 	text: string;
 	icon: string;
 	iconColor: string;
 	order?: number;
-	isFolder: boolean;
+	kind: MenuItemKind;
 	items: MenuItemModel[];
 };

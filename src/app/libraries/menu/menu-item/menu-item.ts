@@ -23,7 +23,7 @@ export class MenuItem {
 	faIcon = computed(() => this.menuItem().icon || "cog");
 
 	itemClicked() {
-		if (this.menuItem().isFolder) {
+		if (this.menuItem().kind === "FOLDER") {
 			this.menuClosed.update((menuClosed) => !menuClosed);
 		} else {
 			this.onItemClicked.emit(this.menuItem());

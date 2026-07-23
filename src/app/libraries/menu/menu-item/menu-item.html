@@ -2,7 +2,7 @@
   <div class="flex select-none">
     <div class="flex cursor-pointer items-center hover:scale-103" (click)="itemClicked()">
       <div class="flex items-center justify-center ml-1 mb-0.5 transform transition-transform duration-300 ease-in-out"
-        [class.hidden]="!menuItem().isFolder" [class.rotate-90]="!menuClosed()">
+        [class.hidden]="menuItem().kind !== 'FOLDER'" [class.rotate-90]="!menuClosed()">
         <fa-icon [icon]="'chevron-right'" class="text-red-400"></fa-icon>
       </div>
 
@@ -18,7 +18,7 @@
     </div>
   </div>
 
-  @if (menuItem().isFolder && menuItem().items) {
+  @if (menuItem().kind === "FOLDER" && menuItem().items) {
   <div class="pl-8 grid transition-[grid-template-rows] duration-300 ease-in-out"
     [style.gridTemplateRows]="menuClosed() ? '0fr' : '1fr'">
     <div class="overflow-hidden min-h-0">
