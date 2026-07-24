@@ -1,4 +1,4 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faBars } from "@fortawesome/free-solid-svg-icons";
@@ -21,6 +21,10 @@ export class App {
 	menuOpen = signal(false);
 	menuData = toSignal(this.menuLoader.loadMenu().pipe(catchError(() => of(null))), {
 		initialValue: undefined,
+	});
+
+	menuDataEffect = effect(() => {
+		console.dir(this.menuData());
 	});
 
 	openMenu() {
