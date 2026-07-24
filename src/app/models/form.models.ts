@@ -1,24 +1,4 @@
-export type Operator =
-	| "equals"
-	| "notEquals"
-	| "contains"
-	| "notContains"
-	| "startsWith"
-	| "endsWith"
-	| "greaterThan"
-	| "lessThan"
-	| "greaterThanOrEqual"
-	| "lessThanOrEqual"
-	| "between"
-	| "notBetween"
-	| "in"
-	| "notIn"
-	| "javascript"
-	| "typescript"
-	| "sql"
-	| "plaintext"
-	| "json"
-	| "css";
+import type {Operator} from "./menu-item-params.models.ts";
 
 export type SelectOptionValue = string | number;
 export type SelectValueResult = SelectOptionValue | SelectOptionValue[] | null;

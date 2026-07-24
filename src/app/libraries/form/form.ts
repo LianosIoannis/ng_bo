@@ -1,7 +1,8 @@
 import { Component, computed, input, linkedSignal, output } from "@angular/core";
 import { disabled, type Field, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import type { EditorLang } from "../../models/editor-lang.model";
-import type { FormInputOption, FormModel, FormResult, Operator, SelectValueResult } from "../../models/form.models";
+import type { FormInputOption, FormModel, FormResult, SelectValueResult } from "../../models/form.models";
+import type { Operator } from "../../models/menu-item-params.models";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
 import { FormInput } from "./form-input/form-input";
