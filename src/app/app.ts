@@ -15,19 +15,19 @@ import { MenuLoader } from "./services/menu-loader";
 	},
 })
 export class App {
-	private readonly menuLoader = inject(MenuLoader);
+	menuLoader = inject(MenuLoader);
 
-	protected readonly menuIcon = faBars;
-	protected readonly menuOpen = signal(false);
-	protected readonly menuData = toSignal(this.menuLoader.loadMenu().pipe(catchError(() => of(null))), {
+	menuIcon = faBars;
+	menuOpen = signal(false);
+	menuData = toSignal(this.menuLoader.loadMenu().pipe(catchError(() => of(null))), {
 		initialValue: undefined,
 	});
 
-	protected openMenu() {
+	openMenu() {
 		this.menuOpen.set(true);
 	}
 
-	protected closeMenu() {
+	closeMenu() {
 		if (!this.menuOpen()) {
 			return;
 		}
