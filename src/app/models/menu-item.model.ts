@@ -1,3 +1,5 @@
+import type { RuntimeMenuItemParams } from "./menu-item-params.runtime.models";
+
 export type MenuItemKind = "FOLDER" | "ITEM";
 
 export type MenuItemModel = {
@@ -6,6 +8,7 @@ export type MenuItemModel = {
 	icon: string;
 	iconColor: string;
 	order?: number;
+	params?: RuntimeMenuItemParams;
 	kind: MenuItemKind;
 	items: MenuItemModel[];
 };
