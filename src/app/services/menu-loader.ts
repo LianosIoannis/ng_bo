@@ -18,7 +18,7 @@ type MenuResponse = Omit<MenuDataModel, "menuItems"> & {
 @Service()
 export class MenuLoader {
 	private readonly http = inject(HttpClient);
-	private readonly menuCode = "admin";
+	private readonly menuCode = "organization";
 	private readonly apiUrl = "http://localhost:3000/api/menus";
 
 	loadMenu() {

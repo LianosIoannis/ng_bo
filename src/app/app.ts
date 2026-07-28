@@ -19,6 +19,7 @@ export class App {
 
 	menuIcon = faBars;
 	menuOpen = signal(false);
+	
 	menuData = toSignal(this.menuLoader.loadMenu().pipe(catchError(() => of(null))), {
 		initialValue: undefined,
 	});
