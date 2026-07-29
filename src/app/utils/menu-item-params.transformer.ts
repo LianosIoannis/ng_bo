@@ -2,6 +2,7 @@ import type { Handler, MenuItemParams, MenuItemParamsBase } from "../models/menu
 import type {
 	HandlerInput,
 	HandlerResult,
+	MaybePromise,
 	RuntimeColumnParams,
 	RuntimeHandler,
 	RuntimeMenuItemParams,
@@ -35,8 +36,22 @@ function transformColumn(column: MenuItemParams["columns"][number]): RuntimeColu
 	return {
 		...column,
 		lookup: {
-			...column.lookup,
-			handler: transformHandler(column.lookup.handler),
+			criteria: {
+				...column.lookup.criteria,
+				handler: transformHandler(column.lookup.criteria.handler),
+			},
+			insert: {
+				...column.lookup.insert,
+				handler: transformHandler(column.lookup.insert.handler),
+			},
+			update: {
+				...column.lookup.update,
+				handler: transformHandler(column.lookup.update.handler),
+			},
+			grid: {
+				...column.lookup.grid,
+				handler: transformHandler(column.lookup.grid.handler),
+			},
 		},
 	};
 }
@@ -52,17 +67,19 @@ function transformHandler(handler: Handler): RuntimeHandler {
 		case "function-query":
 			return {
 				kind: "function-query",
-				src: compileFunction<(context: HandlerInput) => string>(handler.src),
+				src: compileFunction<(context: HandlerInput) => MaybePromise<string>>(handler.src),
 			};
 
 		case "function-data":
 			return {
 				kind: "function-data",
-				src: compileFunction<(context: HandlerInput) => HandlerResult>(handler.src),
+				src: compileFunction<(context: HandlerInput) => MaybePromise<HandlerResult>>(handler.src),
 			};
 	}
 }
 
 function compileFunction<T>(source: string): T {
-	return new Function(`return (${source})`)() as T;
+	const compiled = new Function(`"use strict"; return (${source});`)() as unknown;
+
+	return compiled as T;
 }

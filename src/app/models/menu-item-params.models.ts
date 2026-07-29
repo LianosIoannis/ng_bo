@@ -29,6 +29,19 @@ export type Handler = {
 	src: string;
 };
 
+type LookupConfig = {
+	enabled: boolean;
+	multiple: boolean;
+	handler: Handler;
+};
+
+type ColumnLookupParams = {
+	criteria: LookupConfig;
+	insert: LookupConfig;
+	update: LookupConfig;
+	grid: Omit<LookupConfig, "multiple">;
+};
+
 type ColumnParams = {
 	name: string;
 	label: string;
@@ -60,11 +73,7 @@ type ColumnParams = {
 		required: boolean;
 	};
 
-	lookup: {
-		enabled: boolean;
-		multiple: boolean;
-		handler: Handler;
-	};
+	lookup: ColumnLookupParams;
 };
 
 export type RelationColumnMap = {

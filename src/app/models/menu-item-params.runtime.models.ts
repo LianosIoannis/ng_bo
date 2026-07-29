@@ -1,6 +1,8 @@
 import type { ColumnType, Operator, RelationParams } from "./menu-item-params.models.js";
 
-export type Row = Record<string, string | number | null>;
+export type Row = Record<string, string | number | boolean | null>;
+
+export type MaybePromise<T> = T | Promise<T>;
 
 export type HandlerResult =
 	| {
@@ -21,12 +23,25 @@ export type RuntimeHandler =
 	  }
 	| {
 			kind: "function-query";
-			src: (context: HandlerInput) => string;
+			src: (context: HandlerInput) => MaybePromise<string>;
 	  }
 	| {
 			kind: "function-data";
-			src: (context: HandlerInput) => HandlerResult;
+			src: (context: HandlerInput) => MaybePromise<HandlerResult>;
 	  };
+
+type RuntimeLookupConfig = {
+	enabled: boolean;
+	multiple: boolean;
+	handler: RuntimeHandler;
+};
+
+type RuntimeColumnLookupParams = {
+	criteria: RuntimeLookupConfig;
+	insert: RuntimeLookupConfig;
+	update: RuntimeLookupConfig;
+	grid: Omit<RuntimeLookupConfig, "multiple">;
+};
 
 export type RuntimeColumnParams = {
 	name: string;
@@ -59,11 +74,7 @@ export type RuntimeColumnParams = {
 		required: boolean;
 	};
 
-	lookup: {
-		enabled: boolean;
-		multiple: boolean;
-		handler: RuntimeHandler;
-	};
+	lookup: RuntimeColumnLookupParams;
 };
 
 export type RuntimeMenuItemParamsBase = {
