@@ -1,5 +1,7 @@
 import { Component, computed, input, linkedSignal, output } from "@angular/core";
 import { disabled, type Field, FormField, FormRoot, form, required } from "@angular/forms/signals";
+import { FaIconComponent } from "@fortawesome/angular-fontawesome";
+import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import type { EditorLang } from "../../models/editor-lang.model";
 import type { FormInputOption, FormModel, FormResult, SelectValueResult } from "../../models/form.models";
 import type { Operator } from "../../models/menu-item-params.models";
@@ -10,13 +12,21 @@ import { FormSelect } from "./form-select/form-select";
 
 @Component({
 	selector: "app-form",
-	imports: [FormRoot, FormField, FormSelect, FormInput, FormCheckbox, FormEditor],
+	imports: [FormRoot, FormField, FormSelect, FormInput, FormCheckbox, FormEditor, FaIconComponent],
 	templateUrl: "./form.html",
+	host: {
+		class: "block h-full min-h-0",
+	},
 })
 export class Form {
 	inputOptions = input<FormInputOption[]>([]);
+	formTitle = input("Form");
 	submitLabel = input<string>("Submit");
 	formResult = output<FormResult>();
+	cancelled = output<void>();
+
+	submitIcon = faCheck;
+	cancelIcon = faXmark;
 
 	operatorOptionsMap = computed(() => {
 		return this.inputOptions().map((option) => ({
@@ -112,5 +122,9 @@ export class Form {
 	submitForm(): void {
 		const result = this.formModel();
 		this.formResult.emit(result);
+	}
+
+	cancelForm(): void {
+		this.cancelled.emit();
 	}
 }

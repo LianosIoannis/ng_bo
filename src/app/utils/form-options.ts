@@ -2,6 +2,7 @@ import type { FormInputOption, SelectOption } from "../models/form.models";
 import type {
 	HandlerInput,
 	HandlerResult,
+	RuntimeColumnParams,
 	RuntimeHandler,
 	RuntimeMenuItemParams,
 } from "../models/menu-item-params.runtime.models";
@@ -39,9 +40,56 @@ export async function createCriteriaFormOptions(
 	);
 }
 
+export function createInsertFormOptions(
+	params: RuntimeMenuItemParams,
+	runHandler: RunHandler,
+	context: HandlerInput = {},
+): Promise<FormInputOption[]> {
+	return createOperationFormOptions(params, "insert", runHandler, context);
+}
+
+export function createUpdateFormOptions(
+	params: RuntimeMenuItemParams,
+	runHandler: RunHandler,
+	context: HandlerInput = {},
+): Promise<FormInputOption[]> {
+	return createOperationFormOptions(params, "update", runHandler, context);
+}
+
+async function createOperationFormOptions(
+	params: RuntimeMenuItemParams,
+	operation: "insert" | "update",
+	runHandler: RunHandler,
+	context: HandlerInput,
+): Promise<FormInputOption[]> {
+	const columns = params.columns.filter((column) => column[operation].enabled);
+
+	return Promise.all(
+		columns.map(async (column): Promise<FormInputOption> => {
+			const lookup = column.lookup[operation];
+
+			return {
+				name: column.name,
+				label: column.label,
+				type: column.type === "text" ? "string" : column.type,
+				operators: [column.type === "code" ? "plaintext" : "equals"],
+				defaultOperator: column.type === "code" ? "plaintext" : "equals",
+				showOperator: false,
+				required: column[operation].required,
+				...(lookup.enabled
+					? {
+							options: await loadLookupOptions(column.name, lookup.handler, runHandler, context),
+							multiple: lookup.multiple,
+						}
+					: {}),
+			};
+		}),
+	);
+}
+
 async function loadLookupOptions(
 	columnName: string,
-	handler: RuntimeHandler,
+	handler: RuntimeColumnParams["lookup"]["criteria"]["handler"],
 	runHandler: RunHandler,
 	context: HandlerInput,
 ): Promise<SelectOption[]> {

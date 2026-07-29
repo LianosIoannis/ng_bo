@@ -1,48 +1,67 @@
-<form class="grid gap-4" [formRoot]="optionsForm" (submit)="submitForm()">
-  @for (option of inputOptions(); track option.name) {
-    <div class="grid gap-2">
-      <label class="text-sm font-medium text-slate-950" [attr.for]="option.name">
-        {{ option.label }}
-      </label>
+<form class="flex h-full min-h-0 flex-col bg-white" [formRoot]="optionsForm" [attr.aria-label]="formTitle()"
+  (submit)="submitForm()">
+  <header class="flex h-10 shrink-0 items-center justify-between border-b border-slate-200 px-2">
+    <h2 class="px-2 text-sm font-semibold text-slate-900">{{ formTitle() }}</h2>
 
-      <div class="grid gap-2 md:grid-cols-[minmax(10rem,14rem)_1fr]">
-        <form-select [formField]="optionsForm[option.name].operator" [options]="operatorOptions(option)"
-          [allowClear]="false" />
+    <div class="flex items-center gap-1" role="group" aria-label="Form actions">
+      <button type="submit"
+        class="inline-flex min-h-8 items-center gap-2 rounded-md px-3 text-sm font-medium text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
+        <fa-icon [icon]="submitIcon" aria-hidden="true"></fa-icon>
+        <span>{{ submitLabel() }}</span>
+      </button>
 
-        @if (isRangeOperator(optionsForm[option.name].operator().value())) {
-          <div class="grid gap-2 md:grid-cols-2">
-            <form-input [formField]="inputValueField(option)" [type]="inputType(option)" />
-            <form-input [formField]="inputValueToField(option)" [type]="inputType(option)" />
-          </div>
-        } @else {
-          @switch (option.type) {
-            @case ("boolean") {
-              <form-checkbox [formField]="booleanValueField(option)" />
+      <button type="button"
+        class="inline-flex min-h-8 items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+        (click)="cancelForm()">
+        <fa-icon [icon]="cancelIcon" aria-hidden="true"></fa-icon>
+        <span>Cancel</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="min-h-0 flex-1 overflow-y-auto p-4">
+    <div class="grid gap-4">
+      @for (option of inputOptions(); track option.name) {
+        <div class="grid gap-2">
+          <label class="text-sm font-medium text-slate-950" [attr.for]="option.name">
+            {{ option.label }}
+          </label>
+
+          <div
+            [class]="option.showOperator === false ? 'grid gap-2' : 'grid gap-2 md:grid-cols-[minmax(10rem,14rem)_1fr]'">
+            @if (option.showOperator !== false) {
+            <form-select [formField]="optionsForm[option.name].operator" [options]="operatorOptions(option)"
+              [allowClear]="false" />
             }
 
-            @case ("code") {
-              <form-editor [formField]="codeValueField(option)" [language]="selectedLanguage(option)" />
-            }
-
-            @default {
-              @if (option.options?.length) {
-              <form-select [formField]="selectValueField(option)" [options]="option.options"
-                [multiple]="option.multiple ?? false" />
-              } @else {
+            @if (isRangeOperator(optionsForm[option.name].operator().value())) {
+              <div class="grid gap-2 md:grid-cols-2">
                 <form-input [formField]="inputValueField(option)" [type]="inputType(option)" />
+                <form-input [formField]="inputValueToField(option)" [type]="inputType(option)" />
+              </div>
+            } @else {
+              @switch (option.type) {
+                @case ("boolean") {
+                  <form-checkbox [formField]="booleanValueField(option)" />
+                }
+
+                @case ("code") {
+                  <form-editor [formField]="codeValueField(option)" [language]="selectedLanguage(option)" />
+                }
+
+                @default {
+                  @if (option.options?.length) {
+                  <form-select [formField]="selectValueField(option)" [options]="option.options"
+                    [multiple]="option.multiple ?? false" />
+                  } @else {
+                  <form-input [formField]="inputValueField(option)" [type]="inputType(option)" />
+                  }
+                }
               }
             }
-          }
-        }
-      </div>
+          </div>
+        </div>
+      }
     </div>
-  }
-
-  <div class="flex justify-end">
-    <button
-      class="min-h-10 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-600/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-300"
-      type="submit">
-      {{ submitLabel() }}
-    </button>
   </div>
 </form>
