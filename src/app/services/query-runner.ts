@@ -12,14 +12,14 @@ export class QueryRunner {
 		return this.http.post<HandlerResult>(this.apiUrl, { queryString });
 	}
 
-	async runQuery(queryString: string) {
+	async runQuery(queryString: string): Promise<HandlerResult> {
 		try {
 			const result = await firstValueFrom(this.run(queryString));
 			return result;
 		} catch (error) {
 			return {
 				success: false,
-				error,
+				error: error instanceof Error ? error.message : String(error),
 			};
 		}
 	}
