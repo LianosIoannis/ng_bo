@@ -1,6 +1,6 @@
 # Project Status and Next Steps
 
-Last updated: 29 July 2026
+Last updated: 30 July 2026
 
 ## Project overview
 
@@ -27,10 +27,10 @@ The application uses signals for local state. Selecting a menu item stores the s
 
 ### Menu loading
 
-`MenuLoader` loads the currently hardcoded `admin` menu from:
+`MenuLoader` loads the currently hardcoded `organization` menu from:
 
 ```text
-GET http://localhost:3000/api/menus/admin/json
+GET http://localhost:3000/api/menus/organization/json
 ```
 
 The loader recursively transforms the backend menu response into the runtime menu model expected by the client.
@@ -150,14 +150,27 @@ It contains:
 - A thin toolbar.
 - Insert, delete, edit, and refresh buttons with Font Awesome icons.
 - An AG Grid area below the toolbar.
+- A right-side form drawer shared by criteria, insert, and update operations.
 
-The grid is currently created from the selected item's metadata with empty row data. The buttons and data retrieval are not wired yet.
+Opening a supported form mode:
 
-The application layout has been adjusted so the workspace and grid can consume the available viewport height.
+- Opens the form drawer.
+- Clears any previous form options and errors.
+- Loads the new options asynchronously.
+- Uses `HandlerRunner` for lookup handlers.
+- Displays loading, error, empty, and ready states.
+- Uses operation-specific titles and submit labels.
+- Allows cancellation and closing with Escape.
 
-### Criteria form options
+The inactive side of the workspace uses `inert` while the drawer is open. The closed drawer is also inert, avoiding the earlier focus and `aria-hidden` conflict.
 
-The first form options utility has been created:
+The grid is still created from the selected item's metadata with empty row data. Form submission currently logs the structured `FormResult`; retrieval and mutations are not executed yet.
+
+The application layout has been adjusted so the workspace, drawer, and grid can consume the available viewport height.
+
+### Form option builders
+
+Three asynchronous form option builders now exist:
 
 ```ts
 createCriteriaFormOptions(
@@ -165,15 +178,39 @@ createCriteriaFormOptions(
 	runHandler,
 	context,
 ): Promise<FormInputOption[]>
+
+createInsertFormOptions(
+	params,
+	runHandler,
+	context,
+): Promise<FormInputOption[]>
+
+createUpdateFormOptions(
+	params,
+	runHandler,
+	context,
+): Promise<FormInputOption[]>
 ```
 
-It:
+The criteria builder:
 
 - Includes columns enabled for retrieval criteria.
 - Maps the column's name, label, type, required state, operators, and default operator.
 - Runs enabled criteria lookup handlers.
-- Converts lookup rows containing `value` and `label` into form select options.
-- Rejects the returned promise if a lookup fails.
+
+The insert and update builders:
+
+- Include columns enabled for the corresponding operation.
+- Map the operation-specific required state.
+- Use the corresponding insert or update lookup configuration.
+- Hide the operator selector.
+- Share a small internal operation mapping function.
+
+All three builders:
+
+- Run enabled lookup handlers concurrently.
+- Convert lookup rows containing `value` and `label` into form select options.
+- Reject the returned promise if a lookup fails.
 
 Handler execution is currently supplied as a callback. This keeps the utility independent from Angular dependency injection and makes it reusable and testable.
 
@@ -188,6 +225,49 @@ The agreed lookup row contract is:
 
 The label falls back to the string form of the value when needed.
 
+### Shared form improvements
+
+The generic Signal Forms component now supports the workspace drawer use case:
+
+- Configurable form title.
+- Configurable submit label.
+- Submit and cancel actions with Font Awesome icons.
+- A cancellation output.
+- Optional operator visibility.
+- Optional default values.
+- Required and readonly behavior.
+- Scrollable form content inside a fixed-height drawer.
+
+Criteria forms show their operators. Insert and update forms hide operators while retaining the internal form shape needed by the shared component.
+
+An enabled lookup that returns zero rows is a known edge case: the current template checks `option.options?.length`, so an empty lookup currently falls back to a normal input instead of rendering an empty select.
+
+### Backend seed metadata
+
+The backend organization seed has been expanded into a realistic metadata set for:
+
+- Departments.
+- Job titles.
+- Employees.
+- Projects.
+- Employee/project assignments.
+- Child relations.
+- Query, function-query, and function-data handlers.
+- Query-based and function-based lookup examples.
+
+The seed helpers create the new operation-specific lookup shape and validate the resulting metadata. The backend metadata editor still uses the previous flat lookup structure and must be updated separately.
+
+Some seeded insert and update queries currently place string and date placeholders without outer SQL quotes. This conflicts with the agreed placeholder contract and must be corrected before mutation handlers are executed.
+
+### Current verification
+
+As of this update:
+
+- The Angular development build passes.
+- The backend TypeScript no-emit check passes.
+- The frontend working tree was clean after the latest form and workspace commit.
+- The backend has an uncommitted Prisma initialization migration replacement that should be reviewed before it is committed or discarded.
+
 ## Current flow
 
 The implemented menu and workspace flow is:
@@ -199,7 +279,10 @@ Backend menu endpoint
   -> runtime menu tree
   -> selected menu item
   -> Workspace
-  -> metadata-derived empty grid
+  -> metadata-derived empty grid and workspace form drawer
+  -> criteria, insert, or update form options
+  -> lookup handlers through HandlerRunner
+  -> rendered generic form
 ```
 
 The query infrastructure is also ready:
@@ -213,7 +296,7 @@ Runtime handler
   -> HandlerResult
 ```
 
-The next integration step is to connect these two flows inside the workspace.
+The form drawer is now connected to the handler infrastructure for lookup loading. The next integration boundary is converting a submitted `FormResult` into the correct handler context and executing the selected operation.
 
 ## Important project constraints
 
@@ -275,6 +358,7 @@ This is an explicit trust boundary, not a general public-application security mo
 
 - The client substitutes values only.
 - Metadata query authors own operators, quoting context, and SQL structure.
+- Metadata queries must include outer SQL quotes where their placeholders represent strings, dates, date-times, or times.
 - String apostrophes are escaped during substitution.
 - SQL Server boolean and null representations are already defined.
 - Missing placeholders and empty-array semantics remain open decisions.
@@ -283,11 +367,32 @@ This is an explicit trust boundary, not a general public-application security mo
 
 - Do not reset or reseed an existing database without explicit approval.
 - Existing metadata may still use the old lookup shape and will need either a migration or an approved safe reseed.
+- Review the pending Prisma migration replacement before committing, applying, or removing it.
 - Never place database credentials or other secrets in documentation or client code.
 
 ## Clear next steps
 
-### 1. Finish adopting the lookup contract in the backend
+### 1. Align the seeded SQL with the placeholder contract
+
+Before executing insert or update handlers, correct the seed examples so their SQL owns all required outer quoting.
+
+For example, text and date placeholders need query-authored quotes:
+
+```sql
+VALUES ('@{department_name}', '@{location}', @{annual_budget})
+```
+
+This review should cover:
+
+- Strings.
+- Dates, date-times, and times.
+- Nullable values, because quoting a placeholder that resolves to `NULL` would produce `'NULL'`.
+- Arrays used in `IN` or `NOT IN` clauses.
+- Function-query handlers that combine direct JavaScript values and placeholders.
+
+The nullable case needs a deliberate rule before applying a mechanical update. A query that must support both a quoted value and SQL `NULL` may need to be generated by a function-query handler instead of a simple static query.
+
+### 2. Finish adopting the lookup contract in the backend
 
 Before relying heavily on lookups, complete the backend authoring path:
 
@@ -295,23 +400,41 @@ Before relying heavily on lookups, complete the backend authoring path:
 - Decide how existing stored metadata using the old lookup shape will be handled.
 - Validate a complete exported menu containing each lookup variation.
 - Confirm that the frontend transformer produces the expected runtime handlers from that response.
+- Review and settle the pending Prisma initialization migration replacement.
 
 This step prevents new metadata from being authored in an outdated format.
 
-### 2. Add the criteria form to the workspace
+### 3. Define form-result-to-handler-context conversion
 
-For a selected item:
+The shared form returns this structure for each column:
 
-- Create criteria form options asynchronously with `createCriteriaFormOptions`.
-- Supply a callback that delegates lookup handlers to `HandlerRunner`.
-- Display a loading state while form options and lookups are being prepared.
-- Display a clear error state if any required lookup fails.
-- Render the generic form with the resulting options.
-- Keep the form placement and initial interaction simple.
+```ts
+{
+	operator,
+	value,
+	valueTo,
+}
+```
 
-The form library's operator visibility should also be reviewed. Retrieval criteria require operators, while future insert and update forms generally will not.
+`HandlerRunner` currently expects a flat `HandlerInput`. Before executing forms, define small, explicit converters for:
 
-### 3. Execute the selected item's retrieval handler
+- Criteria results, where operators and range values affect the query.
+- Insert results, where handlers normally need the submitted value for each column.
+- Update results, where submitted values must be combined with primary-key values from the selected row.
+
+The criteria conversion needs agreed behavior for:
+
+- Empty optional fields.
+- `between` and `notBetween`.
+- Multiple lookup values.
+- `in` and `notIn`.
+- Missing values.
+- Empty arrays.
+- Operator-specific SQL generation.
+
+Avoid passing the complete `FormParams` object directly to placeholder replacement because placeholders currently serialize scalar values and arrays, not `{ operator, value, valueTo }` objects.
+
+### 4. Execute the selected item's retrieval handler
 
 When the criteria form is submitted:
 
@@ -324,7 +447,7 @@ When the criteria form is submitted:
 
 The exact handling of ranges, multiple values, missing values, and empty arrays should be agreed before completing this step.
 
-### 4. Implement grid lookups
+### 5. Implement grid lookups
 
 Columns with an enabled `lookup.grid` handler need display formatting:
 
@@ -336,7 +459,7 @@ Columns with an enabled `lookup.grid` handler need display formatting:
 
 This should be added to the grid options utility without coupling that pure mapping function directly to Angular services.
 
-### 5. Wire the refresh and selection behavior
+### 6. Wire refresh, permissions, and selection behavior
 
 After retrieval works:
 
@@ -344,20 +467,23 @@ After retrieval works:
 - Track the selected grid row.
 - Enable Edit and Delete only when their metadata action is enabled and a valid row is selected.
 - Enable Insert only when insertion is configured.
+- Load update defaults from the selected row.
 - Preserve accessible disabled states and labels.
 
-### 6. Add insert and update form option builders
+The workspace should also reset or reload an open form drawer when the selected menu item changes. At present, selecting another item can leave form options from the previous item visible.
 
-Create separate builders rather than forcing all form modes through the criteria builder:
+### 7. Resolve remaining form and drawer edge cases
 
-- `createInsertFormOptions(...)`
-- `createUpdateFormOptions(...)`
+Before relying on the drawer for mutations:
 
-Each builder should map only the fields enabled for that operation and use its corresponding lookup configuration. Update forms will also need initial values from the selected row.
+- Render an empty select when an enabled lookup returns no rows instead of falling back to a normal input.
+- Move focus into the dialog when it opens.
+- Restore focus to the opening button when it closes.
+- Prevent stale asynchronous lookup results from replacing the options for a newer drawer request.
+- Decide whether closing and reopening a form should preserve or reset entered values.
+- Confirm that form submission cannot trigger native page navigation.
 
-Keeping these functions separate makes operation-specific requirements explicit while allowing small internal mapping helpers to be shared.
-
-### 7. Implement mutations one operation at a time
+### 8. Implement mutations one operation at a time
 
 Recommended order:
 
@@ -375,7 +501,7 @@ For each operation:
 
 Delete should include an accessible confirmation step.
 
-### 8. Add children and dependent behavior later
+### 9. Add children and dependent behavior later
 
 Child handlers and `dependsOn`-style lookup dependencies should remain deferred until the main retrieve, insert, update, and delete flows are stable.
 
@@ -386,20 +512,21 @@ When implemented, dependency handling will need:
 - Cancellation or stale-result protection.
 - Clear behavior when a parent value is cleared.
 
-### 9. Add focused tests
+### 10. Add focused tests
 
 The most valuable early tests are for the pure contract and transformation boundaries:
 
 - Query placeholder substitution for every supported value type.
 - Runtime handler dispatch and error normalization.
-- Criteria form option mapping.
+- Criteria, insert, and update form option mapping.
+- Form-result-to-handler-context conversion.
 - Lookup row conversion.
 - Grid column and value formatting.
 - Backend-to-frontend transformation of a representative menu item.
 
 UI tests can then cover drawer focus, workspace loading states, form submission, and toolbar enablement.
 
-### 10. Harden configuration and production behavior
+### 11. Harden configuration and production behavior
 
 Before production readiness:
 
@@ -413,7 +540,11 @@ Before production readiness:
 
 ## Immediate recommended task
 
-The smallest useful next change is to update the backend metadata editor for the new lookup structure and verify one real menu response end to end.
+The smallest useful next step is to settle two contracts before wiring retrieval:
 
-After that, integrate `createCriteriaFormOptions` into the workspace with loading and error states, without executing the main select handler yet. This keeps the next change focused and proves that metadata-driven criteria and lookup options can be rendered correctly before query retrieval is added.
+1. How `FormResult` becomes a flat handler context for criteria, insert, and update.
+2. How query metadata handles quoting when a value may also be `NULL`.
 
+After those decisions, implement a pure criteria-result converter and connect only the retrieval handler. Keep row loading, loading/error states, and grid updates within the workspace, while leaving insert, update, and delete execution for later focused changes.
+
+In parallel or immediately afterward, update the backend metadata editor to the new lookup structure so newly authored metadata cannot revert to the old contract.
