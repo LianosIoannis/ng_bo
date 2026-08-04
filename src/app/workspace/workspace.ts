@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal } from "@angular/core";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
-import { faPenToSquare, faPlus, faRotateRight, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faFilter, faPenToSquare, faPlus, faRotateRight, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { GridOptions } from "ag-grid-community";
 import { Agtable } from "../libraries/agtable/agtable";
 import { Form } from "../libraries/form/form";
@@ -31,6 +31,7 @@ export class Workspace {
 	deleteIcon = faTrash;
 	editIcon = faPenToSquare;
 	refreshIcon = faRotateRight;
+	filterIcon = faFilter;
 
 	formDrawerMode = signal<FormDrawerMode | null>(null);
 	formOptions = signal<FormInputOption[]>([]);

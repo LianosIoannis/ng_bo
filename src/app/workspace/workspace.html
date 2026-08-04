@@ -26,6 +26,13 @@
         class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
         aria-label="Open retrieval criteria" title="Retrieval criteria" aria-controls="workspace-form-drawer"
         [attr.aria-expanded]="formDrawerMode() === 'criteria'" (click)="openFormDrawer('criteria')">
+        <fa-icon [icon]="filterIcon" aria-hidden="true"></fa-icon>
+      </button>
+
+      <button type="button"
+        class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+        aria-label="Open retrieval criteria" title="Retrieval criteria" aria-controls="workspace-form-drawer"
+        [attr.aria-expanded]="formDrawerMode() === 'criteria'" (click)="openFormDrawer('criteria')">
         <fa-icon [icon]="refreshIcon" aria-hidden="true"></fa-icon>
       </button>
     </div>
