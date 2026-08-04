@@ -6,7 +6,7 @@ import { Agtable } from "../libraries/agtable/agtable";
 import { Form } from "../libraries/form/form";
 import type { FormInputOption, FormResult } from "../models/form.models";
 import type { MenuItemModel } from "../models/menu-item.model";
-import type { Row } from "../models/menu-item-params.runtime.models";
+import type { Row, RuntimeMenuItemParams } from "../models/menu-item-params.runtime.models";
 import { HandlerRunner } from "../services/handler-runner";
 import { createCriteriaFormOptions, createInsertFormOptions, createUpdateFormOptions } from "../utils/form-options";
 import { createGridOptions } from "../utils/grid-options";
@@ -23,7 +23,7 @@ type FormDrawerMode = "insert" | "criteria" | "update";
 	},
 })
 export class Workspace {
-	private readonly handlerRunner = inject(HandlerRunner);
+	handlerRunner = inject(HandlerRunner);
 
 	menuItem = input.required<MenuItemModel>();
 
@@ -36,37 +36,31 @@ export class Workspace {
 	formDrawerMode = signal<FormDrawerMode | null>(null);
 	formOptions = signal<FormInputOption[]>([]);
 	formOptionsLoading = signal(false);
-	formOptionsError = signal<string | null>(null);
+	formOptionsError = signal<string>("");
 
-	formDrawerTitle = computed(() => {
-		switch (this.formDrawerMode()) {
-			case "insert":
-				return "Insert row";
-			case "criteria":
-				return "Retrieval criteria";
-			case "update":
-				return "Update row";
-			default:
-				return "";
-		}
-	});
+	metaData = {
+		insert: {
+			title: "Insert row",
+			submit: "Insert",
+			formOptions: (params: RuntimeMenuItemParams) => createInsertFormOptions(params, this.handlerRunner.run),
+		},
+		criteria: {
+			title: "Retrieval criteria",
+			submit: "Retrieve",
+			formOptions: (params: RuntimeMenuItemParams) => createCriteriaFormOptions(params, this.handlerRunner.run),
+		},
+		update: {
+			title: "Update row",
+			submit: "Update",
+			formOptions: (params: RuntimeMenuItemParams) => createUpdateFormOptions(params, this.handlerRunner.run),
+		},
+	};
 
-	formSubmitLabel = computed(() => {
-		switch (this.formDrawerMode()) {
-			case "insert":
-				return "Insert";
-			case "criteria":
-				return "Retrieve";
-			case "update":
-				return "Update";
-			default:
-				return "Submit";
-		}
-	});
+	formTitle = computed(() => this.metaData[this.formDrawerMode() ?? "criteria"].title);
+	formSubmitLabel = computed(() => this.metaData[this.formDrawerMode() ?? "criteria"].submit);
 
 	gridOptions = computed<GridOptions<Row>>(() => {
 		const params = this.menuItem().params;
-
 		return params ? createGridOptions(params, []) : { columnDefs: [], rowData: [] };
 	});
 
@@ -75,7 +69,7 @@ export class Workspace {
 
 		this.formDrawerMode.set(mode);
 		this.formOptions.set([]);
-		this.formOptionsError.set(null);
+		this.formOptionsError.set("");
 		this.formOptionsLoading.set(true);
 
 		if (!params) {
@@ -84,10 +78,8 @@ export class Workspace {
 			return;
 		}
 
-		const runHandler = this.handlerRunner.run.bind(this.handlerRunner);
-
 		try {
-			this.formOptions.set(await this.loadFormOptions(mode, params, runHandler));
+			this.formOptions.set(await this.metaData[mode].formOptions(params));
 		} catch (error) {
 			this.formOptionsError.set(error instanceof Error ? error.message : String(error));
 		} finally {
@@ -98,25 +90,10 @@ export class Workspace {
 	closeFormDrawer(): void {
 		this.formDrawerMode.set(null);
 		this.formOptionsLoading.set(false);
-		this.formOptionsError.set(null);
+		this.formOptionsError.set("");
 	}
 
 	submitForm(result: FormResult): void {
-		console.log(`${this.formDrawerTitle()} form result:`, result);
-	}
-
-	private loadFormOptions(
-		mode: FormDrawerMode,
-		params: NonNullable<MenuItemModel["params"]>,
-		runHandler: HandlerRunner["run"],
-	): Promise<FormInputOption[]> {
-		switch (mode) {
-			case "insert":
-				return createInsertFormOptions(params, runHandler);
-			case "criteria":
-				return createCriteriaFormOptions(params, runHandler);
-			case "update":
-				return createUpdateFormOptions(params, runHandler);
-		}
+		console.log(result);
 	}
 }

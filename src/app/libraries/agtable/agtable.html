@@ -1,1 +1,2 @@
-<ag-grid-angular class="block size-full" [gridOptions]="gridOptions()" (rowClicked)="onRowClicked($event)"/>
+<ag-grid-angular class="block size-full" [gridOptions]="gridOptions()" [columnDefs]="gridOptions().columnDefs"
+    [rowData]="gridOptions().rowData" (rowClicked)="onRowClicked($event)" />

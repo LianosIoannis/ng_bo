@@ -7,7 +7,7 @@ import { QueryRunner } from "./query-runner";
 export class HandlerRunner {
 	private queryRunner = inject(QueryRunner);
 
-	async run(handler: RuntimeHandler, context: HandlerInput = {}): Promise<HandlerResult> {
+	run = async (handler: RuntimeHandler, context: HandlerInput = {}): Promise<HandlerResult> => {
 		try {
 			switch (handler.kind) {
 				case "query":
@@ -23,5 +23,5 @@ export class HandlerRunner {
 				error: error instanceof Error ? error.message : String(error),
 			};
 		}
-	}
+	};
 }
