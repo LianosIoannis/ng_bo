@@ -2,7 +2,6 @@ import { Component, computed, input, linkedSignal, output } from "@angular/core"
 import { disabled, type Field, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
-import type { EditorLang } from "../../models/editor-lang.model";
 import type { FormInputOption, FormModel, FormResult, SelectValueResult } from "../../models/form.models";
 import type { Operator } from "../../models/menu-item-params.models";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
@@ -94,10 +93,6 @@ export class Form {
 
 	selectValueField(option: FormInputOption) {
 		return this.inputField(option) as Field<SelectValueResult>;
-	}
-
-	selectedLanguage(option: FormInputOption) {
-		return this.optionsForm[option.name].operator().value() as EditorLang;
 	}
 
 	inputType(option: FormInputOption): "text" | "number" | "date" | "datetime-local" | "time" {

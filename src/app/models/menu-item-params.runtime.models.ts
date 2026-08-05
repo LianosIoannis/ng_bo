@@ -1,4 +1,4 @@
-import type { ColumnType, Operator, RelationParams } from "./menu-item-params.models.js";
+import type { CodeLanguage, ColumnType, Operator, RelationParams } from "./menu-item-params.models.js";
 
 export type Row = Record<string, string | number | boolean | null>;
 
@@ -47,6 +47,7 @@ export type RuntimeColumnParams = {
 	name: string;
 	label: string;
 	type: ColumnType;
+	language: CodeLanguage;
 
 	primaryKey: boolean;
 

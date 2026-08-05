@@ -12,7 +12,7 @@ import {
 } from "@angular/core";
 import * as monaco from "monaco-editor";
 import { format } from "sql-formatter";
-import type { EditorLang } from "../../models/editor-lang.model";
+import type { CodeLanguage } from "../../models/menu-item-params.models";
 import { MonacoService } from "./monaco-service";
 
 @Component({
@@ -32,7 +32,7 @@ export class Editor implements AfterViewInit, OnDestroy {
 	private editorBlurSubscription?: monaco.IDisposable;
 
 	value = model<string>("");
-	language = input<EditorLang>("plaintext");
+	language = input<CodeLanguage>("plaintext");
 	readonly = input(false);
 	blur = output<void>();
 

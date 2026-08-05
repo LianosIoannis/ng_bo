@@ -1,4 +1,8 @@
-export type ColumnType = "boolean" | "date" | "datetime" | "number" | "text" | "time" | "code";
+export type CodeLanguage = "javascript" | "typescript" | "sql" | "plaintext" | "json" | "css";
+
+export type DataColumnType = "boolean" | "date" | "datetime" | "number" | "text" | "time";
+
+export type ColumnType = DataColumnType | "code";
 
 export type Operator =
 	| "equals"
@@ -14,13 +18,7 @@ export type Operator =
 	| "between"
 	| "notBetween"
 	| "in"
-	| "notIn"
-	| "javascript"
-	| "typescript"
-	| "sql"
-	| "plaintext"
-	| "json"
-	| "css";
+	| "notIn";
 
 type HandlerKind = "query" | "function-query" | "function-data";
 
@@ -46,6 +44,7 @@ type ColumnParams = {
 	name: string;
 	label: string;
 	type: ColumnType;
+	language: CodeLanguage;
 
 	primaryKey: boolean;
 

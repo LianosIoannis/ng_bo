@@ -1,4 +1,4 @@
-import type {Operator} from "./menu-item-params.models.ts";
+import type { CodeLanguage, Operator } from "./menu-item-params.models";
 
 export type SelectOptionValue = string | number;
 export type SelectValueResult = SelectOptionValue | SelectOptionValue[] | null;
@@ -23,6 +23,7 @@ export type FormInputOption = {
 	name: string;
 	label: string;
 	type: FieldType;
+	language?: CodeLanguage;
 	operators: Operator[];
 	defaultOperator?: Operator;
 	showOperator?: boolean;

@@ -46,7 +46,7 @@
                 }
 
                 @case ("code") {
-                  <form-editor [formField]="codeValueField(option)" [language]="selectedLanguage(option)" />
+                  <form-editor [formField]="codeValueField(option)" [language]="option.language ?? 'plaintext'" />
                 }
 
                 @default {

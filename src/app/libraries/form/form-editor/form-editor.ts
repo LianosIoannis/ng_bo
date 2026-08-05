@@ -1,6 +1,6 @@
 import { Component, input, model, output } from "@angular/core";
 import type { FormValueControl } from "@angular/forms/signals";
-import type { EditorLang } from "../../../models/editor-lang.model";
+import type { CodeLanguage } from "../../../models/menu-item-params.models";
 import { Editor } from "../../editor/editor";
 
 @Component({
@@ -15,7 +15,7 @@ export class FormEditor implements FormValueControl<string | null> {
 	readonly required = input(false);
 	readonly touch = output<void>();
 
-	readonly language = input<EditorLang>("plaintext");
+	readonly language = input<CodeLanguage>("plaintext");
 
 	protected updateValue(value: string): void {
 		this.value.set(value || null);

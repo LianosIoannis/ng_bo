@@ -65,8 +65,9 @@ export class FormTest {
 			name: "filterScript",
 			label: "Filter script",
 			type: "code",
-			operators: ["javascript", "typescript", "sql", "json"],
-			defaultOperator: "javascript",
+			language: "javascript",
+			operators: ["equals"],
+			defaultOperator: "equals",
 			defaultValue: "return row.total > 100;",
 		},
 		{

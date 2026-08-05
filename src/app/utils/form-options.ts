@@ -21,13 +21,15 @@ export async function createCriteriaFormOptions(
 	return Promise.all(
 		criteriaColumns.map(async (column): Promise<FormInputOption> => {
 			const lookup = column.lookup.criteria;
+			const isCode = column.type === "code";
 
 			return {
 				name: column.name,
 				label: column.label,
 				type: column.type === "text" ? "string" : column.type,
-				operators: column.retrieve.criteria.operators,
-				defaultOperator: column.retrieve.criteria.defaultOperator,
+				language: column.language,
+				operators: isCode ? ["equals"] : column.retrieve.criteria.operators,
+				defaultOperator: isCode ? "equals" : column.retrieve.criteria.defaultOperator,
 				required: column.retrieve.criteria.required,
 				...(lookup.enabled
 					? {
@@ -72,8 +74,9 @@ async function createOperationFormOptions(
 				name: column.name,
 				label: column.label,
 				type: column.type === "text" ? "string" : column.type,
-				operators: [column.type === "code" ? "plaintext" : "equals"],
-				defaultOperator: column.type === "code" ? "plaintext" : "equals",
+				language: column.language,
+				operators: ["equals"],
+				defaultOperator: "equals",
 				showOperator: false,
 				required: column[operation].required,
 				...(lookup.enabled
