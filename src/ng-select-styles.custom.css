@@ -45,6 +45,8 @@
 }
 
 .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-placeholder {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   padding-bottom: 0px;
-  position: static;
 }
