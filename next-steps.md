@@ -28,11 +28,11 @@ type ColumnLookupParams = {
 	criteria: LookupConfig;
 	insert: LookupConfig;
 	update: LookupConfig;
-	grid: Omit<LookupConfig, "multiple">;
+	grid: Omit<LookupConfig, "multiple" | "dependsOn">;
 };
 ```
 
-The backend metadata editor, validation, seed helpers, models, and transformer now support this shape.
+Criteria, insert, and update lookups carry `dependsOn: string[]`. Grid lookups do not use `multiple` or `dependsOn`. The backend metadata editor, validation, seed helpers, models, and transformer now support this shape.
 
 Column data type and code language are separate concerns:
 
@@ -89,30 +89,42 @@ The AG Grid wrapper binds `columnDefs` and `rowData` explicitly in addition to `
 
 ### Generic forms and option builders
 
-The shared Signal Forms component supports criteria, insert, update, range operators, lookup selects, multiple values, required and readonly fields, default values, configurable actions, and metadata-selected code languages.
+The shared Signal Forms component supports criteria, insert, update, range operators, lookup selects, multiple values, required and readonly fields, default values, configurable actions, and metadata-selected code languages. Its form model, operator options, and validation schema are created once in `ngOnInit`; the workspace destroys the form when the drawer closes so a newly opened form receives a fresh schema.
 
-The asynchronous builders are:
+The option builders are synchronous and pure:
 
 ```ts
-createCriteriaFormOptions(params, runHandler, context)
-createInsertFormOptions(params, runHandler, context)
-createUpdateFormOptions(params, runHandler, context)
+createCriteriaFormOptions(params)
+createInsertFormOptions(params, formData)
+createUpdateFormOptions(params, rowData, formData)
 ```
 
 They:
 
 - Include only columns enabled for the requested operation.
-- Use operation-specific lookup handlers.
-- Execute enabled lookups concurrently through the supplied callback.
-- Reject if a lookup fails.
-- Convert `{ value, label }` rows into select options.
-- Preserve `string | number` lookup values.
-- Fall back to `String(value)` when a label is missing.
+- Pass operation-specific lookup handlers and `dependsOn` metadata to the Form.
 - Pass `column.language` to code editors.
 - Force code criteria to `equals`.
 - Hide operators and use `equals` internally for insert and update forms.
+- Populate update fields from the selected row and prefer saved submitted data when reopening a failed mutation.
+- Normalize date defaults for native date inputs with `value.slice(0, 10)`.
 
-An enabled lookup returning no rows remains an edge case: the current template falls back to a normal input because it checks `option.options?.length`.
+The Form now owns lookup execution through `HandlerRunner`:
+
+- It creates a context containing the current value of every form field.
+- Lookups without dependencies run immediately.
+- Lookups with dependencies run only when every declared dependency has a value.
+- The union of dependency values is debounced for 250 ms with Angular 22's `debounced()` API.
+- A single effect reruns the lookup loader after the dependency context settles.
+- Lookup handlers run concurrently and failed handlers produce a form-level error.
+- Returned `{ value, label }` rows preserve `string | number` values and fall back to `String(value)` when a label is missing.
+- An enabled lookup returning no rows remains an empty select.
+- Values that are no longer present in refreshed lookup options are removed.
+- A generation counter prevents an older lookup batch from replacing newer results.
+
+`debounced()` is an Angular 22 experimental API. It replaced the earlier RxJS `toObservable`/`toSignal` and `debounceTime` pipeline and should be reviewed when Angular promotes or changes the API.
+
+`createRetrieveHandlerInput(criteria)` now converts saved retrieval criteria into handler context. Non-empty values are exposed as flat properties for existing placeholders and function destructuring, while the complete `FormResult` is also available under `context.criteria` for handlers that need operators or range endpoints.
 
 ### Workspace component
 
@@ -122,20 +134,24 @@ The workspace receives a required `MenuItemModel` and contains:
 - Insert, delete, edit, filter, and refresh Font Awesome buttons.
 - AG Grid below the toolbar.
 - A right-side drawer shared by criteria, insert, and update forms.
-- Async form-option loading with loading, error, empty, and ready states.
+- Computed form options derived from the service-selected drawer mode.
 - `inert`, Escape, backdrop, and cancel behavior.
+- Real row data from the select handler, AG Grid's loading overlay, and a retrieval error banner.
+- AG Grid selection stored in `WorkspaceService.selectedRow`, with toolbar availability derived from metadata, permissions, and selection.
+- Update form defaults populated from the selected row.
+- An accessible reusable confirmation dialog for deletion.
 
-The component still owns temporary drawer state directly. Form submission logs `FormResult`; data handlers are not connected yet, and grid rows remain empty.
+`Workspace` provides `WorkspaceService` at component level. Its menu-item effect initializes the service inside `untracked()`, so service state reads cannot accidentally become dependencies of that effect. Drawer visibility, toolbar availability, rows, selection, loading, confirmation, and errors are derived from service signals. Criteria, insert, and update submissions, Refresh, and confirmed Delete execute their handlers.
 
-### Workspace service skeleton
+### Workspace service and retrieval
 
-`WorkspaceService` exists as a component-scoped service:
+`WorkspaceService` is a component-scoped service:
 
 ```ts
 @Service({ autoProvided: false })
 ```
 
-It is not root-provided because each future tab/workspace must own an independent state instance.
+It is not root-provided because each future tab/workspace must own an independent state instance. `Workspace` now provides and injects it.
 
 It defines explicit signals for the menu item, rows, selected row, retrieve criteria, insert data, update data, operation-specific errors, and active flow. Computed state determines:
 
@@ -145,7 +161,19 @@ It defines explicit signals for the menu item, rows, selected row, retrieve crit
 - Which operations are possible.
 - Which drawer should be displayed.
 
-`initialize(menuItem)` resets state and starts the retrieve flow. The service is not yet provided by or connected to `Workspace`.
+`initialize(menuItem)` resets state and starts the retrieve flow. Retrieval:
+
+- Waits when required criteria are missing, allowing the computed drawer to request them.
+- Runs the menu item's select handler through `HandlerRunner` when retrieval can proceed.
+- Stores successful rows and exposes them to AG Grid.
+- Stores failures without removing rows already displayed by a previous successful retrieval.
+- Reuses saved criteria for Refresh.
+- Uses a generation counter so results from an older menu item or request cannot replace current rows.
+- Exposes `retrieveLoading` for AG Grid's native loading overlay and disables Refresh while loading.
+
+Delete uses the selected row as handler context. It requires explicit confirmation, blocks dismissal while running, clears selection and retrieves fresh rows on success, and stores the delete error without refreshing on failure. Its operation generation prevents a response from an older workspace item from changing current state.
+
+Insert and update now follow the agreed flows. Submitted form values are exposed as flat handler properties and as the complete `data` object. Update context also includes the selected row, with submitted values taking precedence. Failed mutations retain their submitted data and reopen the populated form; successful mutations clear saved data, clear update selection when applicable, and retrieve fresh rows. Insert and update have independent loading and error signals.
 
 ### Agreed operation flows
 
@@ -174,12 +202,16 @@ The UI should derive visibility from computed service state. Event handlers shou
 - The earlier drawer focus/`aria-hidden` warning was removed.
 - Font Awesome icons replaced custom menu-button spans.
 - The multiple-select placeholder is vertically centered in the customized 44px control.
+- Required Signal Form fields are validated on submission after the form tree is initialized in `ngOnInit`.
+- The form drawer uses a container-scoped `ngx-spinner` while lookup handlers run.
+- The spinner is controlled through a named `NgxSpinnerService` effect because version 21.1.0 ignores an initially true `showSpinner` input.
+- Effect cleanup hides the spinner when loading finishes or the Form is destroyed.
+- Spinner overlay animation is disabled to avoid its built-in 300 ms appearance delay; the loader animation remains enabled.
+- `ngx-spinner` uses Angular's native animation support, so `provideAnimations()` is not configured.
 
 ## Current verification
 
 - The Angular production build passes.
-- The backend TypeScript check passes.
-- Both repositories were clean when this document was updated.
 - The Angular build still reports the existing initial-bundle budget warning and Day.js CommonJS warning.
 
 ## Important project constraints
@@ -221,71 +253,41 @@ The current design assumes a trusted internal application: metadata functions ex
 
 ## Clear next steps
 
-### 1. Connect `WorkspaceService` to `Workspace`
+### 1. Finish retrieval criteria behavior
 
-- Provide it at workspace-component level.
-- Initialize it when the `menuItem` input changes.
-- Replace only state that already has a direct service equivalent.
-- Derive the visible drawer from `WorkspaceService.drawer`.
-- Keep async form-option loading in the component initially.
+- Populate the criteria form from saved criteria when Filter is reopened.
+- Add `defaultValueTo` support for saved range criteria.
+- Decide the final convention for optional empty values and unresolved placeholders.
+- Author criteria-aware select handlers as `function-query`; current static select queries intentionally ignore submitted criteria.
+- Verify required criteria and retrieval errors with real metadata.
 
-This should be a wiring step, not a broad rewrite of `Workspace`, `Form`, or form models.
+### 2. Verify mutation metadata end to end
 
-### 2. Define pure form-result context converters
+- Exercise insert and update against real metadata and backend handlers.
+- Confirm backend-owned SQL quoting for text and date values.
+- Verify failed handlers reopen populated forms and successful handlers refresh the grid.
+- Decide whether mutation success feedback is needed beyond the refreshed table.
 
-`FormResult` stores `{ operator, value, valueTo }` for each column. Before executing handlers, define small converters for retrieve criteria, insert values, and update values combined with selected-row primary keys.
-
-Do not pass complete `FormParams` objects directly to placeholder replacement. Decide criteria behavior for optional empty values, range operators, `in`/`notIn`, multiple lookup values, missing values, and empty arrays.
-
-### 3. Implement retrieval only
-
-- Start retrieval when the menu item initializes.
-- Let computed state request required criteria.
-- Save submitted criteria.
-- Execute the select handler through `HandlerRunner`.
-- Store successful rows or the retrieval error.
-- Feed service rows into `createGridOptions`.
-- Make Refresh reuse saved criteria.
-- Make Filter reopen saved criteria.
-- Add loading, error, and empty states.
-
-Keep insert, update, and delete execution out of this step.
-
-### 4. Wire selection and permissions
-
-- Store AG Grid selection in `selectedRow`.
-- Drive toolbar enabled states from `possibilities`.
-- Enable actions only when metadata, permissions, and selection allow them.
-- Load update defaults from the selected row.
-- Correct Refresh so it starts retrieval rather than opening criteria.
-
-### 5. Implement mutations separately
-
-Recommended order:
-
-1. Insert.
-2. Update.
-3. Delete with an accessible confirmation.
-
-Follow the agreed success and failure transitions exactly and verify each operation before starting the next.
-
-### 6. Implement grid lookups
+### 3. Implement grid lookups
 
 Run enabled grid lookups outside the pure grid mapper, convert them to value-label maps, preserve raw row values, and use the maps in value formatters. Define missing-value and lookup-failure behavior.
 
-### 7. Resolve remaining form and drawer edge cases
+### 4. Resolve remaining form and drawer edge cases
 
-- Render an empty select when an enabled lookup returns no rows.
 - Move focus into the drawer and restore it on close.
-- Prevent stale lookup promises from replacing newer options.
 - Decide whether reopened forms preserve values.
 - Ensure submission cannot trigger native navigation.
+- Decide whether lookup errors should remain form-level or become field-specific.
+- Validate unknown, self-referencing, and circular `dependsOn` metadata.
+- Verify chained lookup dependencies and multiple-value dependencies with real metadata.
+- Decide whether all lookups should reload when any dependency changes or only affected lookups if forms become large.
+- Revisit Angular's experimental `debounced()` API on framework upgrades.
 
-### 8. Add focused tests
+### 5. Add focused tests
 
 Prioritize placeholder replacement, handler dispatch, form-option mapping, code-language mapping, the code `equals` invariant, context conversion, lookup conversion, grid formatting, menu-item column changes, and workspace retrieve-flow decisions.
 
-### 9. Production hardening later
+### 6. Production hardening later
 
 - Move API URLs into environment configuration.
 - Resolve bundle and Day.js warnings.
@@ -296,4 +298,4 @@ Prioritize placeholder replacement, handler dispatch, form-option mapping, code-
 
 ## Immediate recommended task
 
-Connect `WorkspaceService` to `Workspace` without executing handlers yet. Initialize it from the menu-item input and derive the visible drawer from its computed state. This establishes the declarative foundation for implementing retrieval in the following small step.
+Exercise Insert and Update with real backend metadata, then fix only any contract mismatches revealed by those runs.

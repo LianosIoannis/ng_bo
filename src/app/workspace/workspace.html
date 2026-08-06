@@ -1,45 +1,56 @@
 <div class="relative flex h-full min-h-0 flex-col overflow-hidden">
   <header class="flex h-10 shrink-0 items-center justify-end border-b border-slate-200 bg-white px-2"
-    [attr.inert]="formDrawerMode() ? '' : null">
+    [attr.inert]="interactionBlocked() ? '' : null">
     <div class="flex items-center gap-1" role="toolbar" aria-label="Workspace actions">
       <button type="button"
         class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
         aria-label="Insert row" title="Insert" aria-controls="workspace-form-drawer"
-        [attr.aria-expanded]="formDrawerMode() === 'insert'" (click)="openFormDrawer('insert')">
+        [attr.aria-expanded]="formDrawerMode() === 'insert'" [disabled]="!workspace.possibilities().insert"
+        (click)="openFormDrawer('insert')">
         <fa-icon [icon]="insertIcon" aria-hidden="true"></fa-icon>
       </button>
 
       <button type="button"
         class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
-        aria-label="Delete selected row" title="Delete">
+        aria-label="Delete selected row" title="Delete" [disabled]="!workspace.possibilities().delete"
+        (click)="deleteRow()">
         <fa-icon [icon]="deleteIcon" aria-hidden="true"></fa-icon>
       </button>
 
       <button type="button"
         class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
         aria-label="Edit selected row" title="Edit" aria-controls="workspace-form-drawer"
-        [attr.aria-expanded]="formDrawerMode() === 'update'" (click)="openFormDrawer('update')">
+        [attr.aria-expanded]="formDrawerMode() === 'update'" [disabled]="!workspace.possibilities().update"
+        (click)="openFormDrawer('update')">
         <fa-icon [icon]="editIcon" aria-hidden="true"></fa-icon>
       </button>
 
       <button type="button"
         class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
         aria-label="Open retrieval criteria" title="Retrieval criteria" aria-controls="workspace-form-drawer"
-        [attr.aria-expanded]="formDrawerMode() === 'criteria'" (click)="openFormDrawer('criteria')">
+        [attr.aria-expanded]="formDrawerMode() === 'criteria'" [disabled]="!workspace.possibilities().filter"
+        (click)="openFormDrawer('criteria')">
         <fa-icon [icon]="filterIcon" aria-hidden="true"></fa-icon>
       </button>
 
       <button type="button"
         class="inline-flex size-8 items-center justify-center rounded-md text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
-        aria-label="Open retrieval criteria" title="Retrieval criteria" aria-controls="workspace-form-drawer"
-        [attr.aria-expanded]="formDrawerMode() === 'criteria'" (click)="openFormDrawer('criteria')">
+        aria-label="Refresh rows" title="Refresh" [disabled]="!workspace.possibilities().retrieve || workspace.retrieveLoading()"
+        (click)="refresh()">
         <fa-icon [icon]="refreshIcon" aria-hidden="true"></fa-icon>
       </button>
     </div>
   </header>
 
-  <section class="min-h-0 flex-1" aria-label="Table" [attr.inert]="formDrawerMode() ? '' : null">
-    <agtable [gridOptions]="gridOptions()" />
+  @if (workspaceError(); as error) {
+  <div class="shrink-0 border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800" role="alert">
+    {{ error }}
+  </div>
+  }
+
+  <section class="min-h-0 flex-1" aria-label="Table" [attr.inert]="interactionBlocked() ? '' : null"
+    [attr.aria-busy]="workspace.retrieveLoading() || workspace.insertLoading() || workspace.updateLoading()">
+    <agtable [gridOptions]="gridOptions()" (selectionChanged)="selectRow($event)" />
   </section>
 
   @if (formDrawerMode()) {
@@ -51,19 +62,16 @@
     class="absolute inset-y-0 right-0 z-20 flex w-full max-w-2xl transform flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out motion-reduce:transition-none"
     [class.translate-x-full]="formDrawerMode() === null" [class.translate-x-0]="formDrawerMode() !== null"
     [attr.inert]="formDrawerMode() ? null : ''" role="dialog" aria-modal="true" [attr.aria-label]="formTitle()">
-    @if (formOptionsLoading()) {
-    <div class="flex min-h-32 flex-1 items-center justify-center text-sm text-slate-600" role="status">
-      Loading form…
-    </div>
-    } @else if (formOptionsError(); as error) {
-    <div class="m-4 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
-      {{ error }}
-    </div>
-    } @else if (formDrawerMode() && formOptions().length) {
+    @if (formDrawerMode() && formOptions().length) {
     <app-form [formTitle]="formTitle()" [inputOptions]="formOptions()" [submitLabel]="formSubmitLabel()"
       (formResult)="submitForm($event)" (cancelled)="closeFormDrawer()" />
     } @else {
     <p class="p-4 text-sm text-slate-600" role="status">No fields are configured for this form.</p>
     }
   </aside>
+
+  @if (workspace.deleteConfirmation()) {
+  <app-confirmation-dialog title="Delete row" [message]="deleteMessage()" confirmLabel="Delete"
+    [loading]="workspace.deleteLoading()" (confirmed)="confirmDelete()" (cancelled)="closeFormDrawer()" />
+  }
 </div>

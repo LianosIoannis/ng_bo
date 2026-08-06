@@ -1,5 +1,6 @@
-import type { FormInputOption } from "../models/form.models";
-import type { RuntimeMenuItemParams } from "../models/menu-item-params.runtime.models";
+import type { FormInputOption, FormResult } from "../models/form.models";
+import type { ColumnType } from "../models/menu-item-params.models";
+import type { Row, RuntimeMenuItemParams } from "../models/menu-item-params.runtime.models";
 
 export function createCriteriaFormOptions(params: RuntimeMenuItemParams): FormInputOption[] {
 	const criteriaColumns = params.columns.filter(
@@ -29,19 +30,33 @@ export function createCriteriaFormOptions(params: RuntimeMenuItemParams): FormIn
 	});
 }
 
-export function createInsertFormOptions(params: RuntimeMenuItemParams): FormInputOption[] {
-	return createOperationFormOptions(params, "insert");
+export function createInsertFormOptions(
+	params: RuntimeMenuItemParams,
+	formData: FormResult | null = null,
+): FormInputOption[] {
+	return createOperationFormOptions(params, "insert", null, formData);
 }
 
-export function createUpdateFormOptions(params: RuntimeMenuItemParams): FormInputOption[] {
-	return createOperationFormOptions(params, "update");
+export function createUpdateFormOptions(
+	params: RuntimeMenuItemParams,
+	rowData: Row | null,
+	formData: FormResult | null = null,
+): FormInputOption[] {
+	return createOperationFormOptions(params, "update", rowData, formData);
 }
 
-function createOperationFormOptions(params: RuntimeMenuItemParams, operation: "insert" | "update"): FormInputOption[] {
+function createOperationFormOptions(
+	params: RuntimeMenuItemParams,
+	operation: "insert" | "update",
+	rowData: Row | null = null,
+	formData: FormResult | null = null,
+): FormInputOption[] {
 	const columns = params.columns.filter((column) => column[operation].enabled);
 
 	return columns.map((column): FormInputOption => {
 		const lookup = column.lookup[operation];
+		const submittedParams = formData?.[column.name];
+		const defaultValue = submittedParams ? submittedParams.value : rowData?.[column.name];
 
 		return {
 			name: column.name,
@@ -52,6 +67,7 @@ function createOperationFormOptions(params: RuntimeMenuItemParams, operation: "i
 			defaultOperator: "equals",
 			showOperator: false,
 			required: column[operation].required,
+			defaultValue: normalizeDefaultValue(column.type, defaultValue),
 			...(lookup.enabled
 				? {
 						multiple: lookup.multiple,
@@ -61,4 +77,11 @@ function createOperationFormOptions(params: RuntimeMenuItemParams, operation: "i
 				: {}),
 		};
 	});
+}
+
+function normalizeDefaultValue(
+	type: ColumnType,
+	value: FormInputOption["defaultValue"],
+): FormInputOption["defaultValue"] {
+	return type === "date" && typeof value === "string" ? value.slice(0, 10) : value;
 }

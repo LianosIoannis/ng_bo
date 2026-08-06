@@ -1,0 +1,22 @@
+<button type="button" class="absolute inset-0 cursor-default bg-slate-950/40" tabindex="-1"
+  aria-label="Cancel confirmation" [disabled]="loading()" (click)="cancel()"></button>
+
+<section class="relative w-full max-w-md rounded-lg bg-white p-5 shadow-2xl" role="alertdialog" aria-modal="true"
+  aria-labelledby="confirmation-dialog-title" aria-describedby="confirmation-dialog-message">
+  <h2 id="confirmation-dialog-title" class="text-base font-semibold text-slate-950">{{ title() }}</h2>
+  <p id="confirmation-dialog-message" class="mt-2 text-sm text-slate-700">{{ message() }}</p>
+
+  <div class="mt-5 flex justify-end gap-2">
+    <button type="button"
+      class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+      [disabled]="loading()" autofocus (click)="cancel()">
+      Cancel
+    </button>
+
+    <button type="button"
+      class="rounded-md bg-rose-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+      [disabled]="loading()" (click)="confirmed.emit()">
+      {{ loading() ? "Deleting…" : confirmLabel() }}
+    </button>
+  </div>
+</section>
