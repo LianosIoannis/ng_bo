@@ -1,59 +1,27 @@
 # Project Status and Next Steps
 
-Last updated: 30 July 2026
+Last updated: 6 August 2026
 
 ## Project overview
 
-This workspace contains two related but separate applications:
+This workspace contains two related applications:
 
 - `ng_bo`: the Angular metadata-driven back-office client.
 - `bo_db`: the backend that stores menu metadata and executes queries.
 
-They are separate repositories, but the metadata contracts used by the client and backend must remain aligned. The application is still being built incrementally, with an emphasis on keeping each step simple and understandable.
+They are separate repositories, but their metadata contracts must remain aligned. Development is intentionally incremental: prefer small, understandable changes and discuss broader architectural changes before implementing them.
 
 ## What has been implemented
 
-### Application shell
+### Application shell and menu
 
-The Angular application now has the initial layout:
+The Angular application has a compact header, a Font Awesome menu button, a left-side menu drawer, and a workspace below the header. Selecting a menu item stores it in a signal, closes the menu, and displays the workspace.
 
-- A small main header.
-- A button with a Font Awesome icon that opens the menu.
-- A menu displayed as a drawer.
-- A workspace area below the main header.
-- Drawer focus and accessibility behavior has been kept simple; the earlier `aria-hidden` focus warning was removed with the unnecessary behavior that caused it.
+`MenuLoader` currently loads the hardcoded `organization` menu from the backend and recursively transforms serialized parameters into runtime parameters. Menu entries use the backend `kind: "FOLDER" | "ITEM"` contract; the earlier frontend-only `isFolder` concept is no longer used.
 
-The application uses signals for local state. Selecting a menu item stores the selected item, closes the drawer, and displays the workspace.
+### Metadata contracts
 
-### Menu loading
-
-`MenuLoader` loads the currently hardcoded `organization` menu from:
-
-```text
-GET http://localhost:3000/api/menus/organization/json
-```
-
-The loader recursively transforms the backend menu response into the runtime menu model expected by the client.
-
-The menu model inconsistency was resolved in favor of the backend contract:
-
-- Menu entries use `kind: "FOLDER" | "ITEM"`.
-- The previous frontend-only `isFolder` field is no longer the source of truth.
-
-Menu item parameters returned by the backend are transformed inside `MenuLoader`, so consumers receive `RuntimeMenuItemParams` with executable runtime handlers rather than the serialized handler definitions.
-
-### Metadata models and transformer
-
-The backend parameter models and transformer were brought into the frontend. The two applications now share the same conceptual metadata structure, including:
-
-- Columns and their data types.
-- Retrieve criteria configuration.
-- Insert and update configuration.
-- Select, insert, update, delete, and child handlers.
-- Query, function-query, and function-data handlers.
-- Operation-specific lookup configuration.
-
-Lookups are now configured separately for each use:
+The frontend and backend are aligned conceptually for columns, retrieval criteria, mutations, runtime handlers, child relations, and operation-specific lookups:
 
 ```ts
 type ColumnLookupParams = {
@@ -64,487 +32,268 @@ type ColumnLookupParams = {
 };
 ```
 
-This allows the same column to use different lookup behavior when it is:
+The backend metadata editor, validation, seed helpers, models, and transformer now support this shape.
 
-- Used as a retrieval criterion.
-- Edited during insertion.
-- Edited during an update.
-- Displayed in the grid.
+Column data type and code language are separate concerns:
 
-The backend models, validation schema, seed helpers, runtime model, and transformer have been updated for this structure. The backend metadata editor still needs to be updated because it currently assumes the previous flat lookup structure.
-
-### Query runner
-
-`QueryRunner` provides the client-side service for the backend query endpoint:
-
-```text
-POST http://localhost:3000/api/query
+```ts
+type DataColumnType = "boolean" | "date" | "datetime" | "number" | "text" | "time";
+type ColumnType = DataColumnType | "code";
+type CodeLanguage = "javascript" | "typescript" | "sql" | "plaintext" | "json" | "css";
 ```
 
-It:
+- Each column carries a `language` value.
+- Code fields always use the `equals` operator.
+- Language names are no longer part of `Operator`.
+- The duplicate frontend `EditorLang` model was removed.
+- The generic editor and form editor use `CodeLanguage` from the menu-item parameter model.
 
-- Sends the query string to the backend.
-- Uses `firstValueFrom` so callers can run it immediately with `await`.
-- Returns `Promise<HandlerResult>`.
-- Normalizes request failures into a failed `HandlerResult`.
+### Query and handler execution
 
-### Generic handler runner
+`QueryRunner` sends SQL to `POST /api/query`. It uses `firstValueFrom`, returns `Promise<HandlerResult>`, and converts request failures into failed results.
 
-`HandlerRunner` runs every supported runtime handler type, not only lookup handlers:
+`HandlerRunner` provides one generic execution path:
 
-- A query handler replaces placeholders and sends the resulting query to `QueryRunner`.
-- A function-query handler first runs its function, then replaces placeholders in the returned query and sends it to `QueryRunner`.
-- A function-data handler returns the data produced by its function.
+- `query`: replace placeholders and call `QueryRunner`.
+- `function-query`: execute the function, replace placeholders in its result, and call `QueryRunner`.
+- `function-data`: execute the function and return its result.
 
-Errors are returned consistently as failed `HandlerResult` values.
+Its `run` method is an arrow function, so it can safely be passed as a callback without manual binding.
 
 ### Query placeholder substitution
 
-Queries and function-generated queries may contain placeholders in this form:
+Queries can contain placeholders such as `@{columnName}`. The replacement utility iterates through the supplied context with `replaceAll`. It substitutes values only; metadata owns SQL operators, surrounding quotes, and query structure.
 
-```text
-@{columnName}
-```
+Current rules are:
 
-The replacement utility iterates through the supplied form values and uses `replaceAll`. It only substitutes values; the query author remains responsible for operators, SQL structure, and any outer quoting.
-
-Current value rules are:
-
-- Strings have embedded apostrophes escaped.
+- String apostrophes are escaped.
 - Numbers are inserted directly.
 - Booleans become `1` or `0` for SQL Server.
 - `null` becomes `NULL`.
 - Arrays become comma-separated, individually quoted values.
 
-The behavior for missing values, `undefined`, and empty arrays has intentionally been left for a later decision. At present, their placeholders remain unresolved.
+Missing values, `undefined`, empty arrays, and nullable values inside query-authored quotes still need explicit decisions.
 
-### Grid options utility
+### Grid options
 
-`createGridOptions(menuItemParams, rowData)` creates AG Grid options from `RuntimeMenuItemParams`.
-
-It currently maps:
-
-- Column name and label.
-- Visibility.
-- Sorting.
-- Filtering.
-- Supplied row data.
-
-Formatting rules include:
+`createGridOptions(params, rowData)` maps runtime metadata and rows into AG Grid options. It currently supports visibility, sorting, filtering, pagination, single-row selection, content-based sizing, and these formatters:
 
 - Date: `DD/MM/YYYY`.
-- Date and time: `DD/MM/YYYY HH:mm`.
+- Date-time: `DD/MM/YYYY HH:mm`.
 - Time: `HH:mm`.
-- Code: the first 30 characters.
+- Code: first 30 characters.
 
-Date, date-time, and time columns use AG Grid's `dateTimeString` cell data type, with Day.js used for formatting.
+Date, date-time, and time columns use AG Grid's `dateTimeString` cell data type.
 
-The initial shared grid behavior also includes pagination, single-row selection, content-based column sizing, and the selected AG Grid theme.
+The AG Grid wrapper binds `columnDefs` and `rowData` explicitly in addition to `gridOptions`. This ensures that changing the selected menu item refreshes the displayed columns and rows. Grid lookup formatting is not implemented yet.
+
+### Generic forms and option builders
+
+The shared Signal Forms component supports criteria, insert, update, range operators, lookup selects, multiple values, required and readonly fields, default values, configurable actions, and metadata-selected code languages.
+
+The asynchronous builders are:
+
+```ts
+createCriteriaFormOptions(params, runHandler, context)
+createInsertFormOptions(params, runHandler, context)
+createUpdateFormOptions(params, runHandler, context)
+```
+
+They:
+
+- Include only columns enabled for the requested operation.
+- Use operation-specific lookup handlers.
+- Execute enabled lookups concurrently through the supplied callback.
+- Reject if a lookup fails.
+- Convert `{ value, label }` rows into select options.
+- Preserve `string | number` lookup values.
+- Fall back to `String(value)` when a label is missing.
+- Pass `column.language` to code editors.
+- Force code criteria to `equals`.
+- Hide operators and use `equals` internally for insert and update forms.
+
+An enabled lookup returning no rows remains an edge case: the current template falls back to a normal input because it checks `option.options?.length`.
 
 ### Workspace component
 
-The workspace is a focused standalone component that receives the selected `MenuItemModel` as a required input.
+The workspace receives a required `MenuItemModel` and contains:
 
-It contains:
+- A thin right-aligned toolbar.
+- Insert, delete, edit, filter, and refresh Font Awesome buttons.
+- AG Grid below the toolbar.
+- A right-side drawer shared by criteria, insert, and update forms.
+- Async form-option loading with loading, error, empty, and ready states.
+- `inert`, Escape, backdrop, and cancel behavior.
 
-- A thin toolbar.
-- Insert, delete, edit, and refresh buttons with Font Awesome icons.
-- An AG Grid area below the toolbar.
-- A right-side form drawer shared by criteria, insert, and update operations.
+The component still owns temporary drawer state directly. Form submission logs `FormResult`; data handlers are not connected yet, and grid rows remain empty.
 
-Opening a supported form mode:
+### Workspace service skeleton
 
-- Opens the form drawer.
-- Clears any previous form options and errors.
-- Loads the new options asynchronously.
-- Uses `HandlerRunner` for lookup handlers.
-- Displays loading, error, empty, and ready states.
-- Uses operation-specific titles and submit labels.
-- Allows cancellation and closing with Escape.
-
-The inactive side of the workspace uses `inert` while the drawer is open. The closed drawer is also inert, avoiding the earlier focus and `aria-hidden` conflict.
-
-The grid is still created from the selected item's metadata with empty row data. Form submission currently logs the structured `FormResult`; retrieval and mutations are not executed yet.
-
-The application layout has been adjusted so the workspace, drawer, and grid can consume the available viewport height.
-
-### Form option builders
-
-Three asynchronous form option builders now exist:
+`WorkspaceService` exists as a component-scoped service:
 
 ```ts
-createCriteriaFormOptions(
-	params,
-	runHandler,
-	context,
-): Promise<FormInputOption[]>
-
-createInsertFormOptions(
-	params,
-	runHandler,
-	context,
-): Promise<FormInputOption[]>
-
-createUpdateFormOptions(
-	params,
-	runHandler,
-	context,
-): Promise<FormInputOption[]>
+@Service({ autoProvided: false })
 ```
 
-The criteria builder:
+It is not root-provided because each future tab/workspace must own an independent state instance.
 
-- Includes columns enabled for retrieval criteria.
-- Maps the column's name, label, type, required state, operators, and default operator.
-- Runs enabled criteria lookup handlers.
+It defines explicit signals for the menu item, rows, selected row, retrieve criteria, insert data, update data, operation-specific errors, and active flow. Computed state determines:
 
-The insert and update builders:
+- Whether criteria and required criteria exist.
+- Whether insert and update fields exist.
+- Whether saved criteria or operation data exists.
+- Which operations are possible.
+- Which drawer should be displayed.
 
-- Include columns enabled for the corresponding operation.
-- Map the operation-specific required state.
-- Use the corresponding insert or update lookup configuration.
-- Hide the operator selector.
-- Share a small internal operation mapping function.
+`initialize(menuItem)` resets state and starts the retrieve flow. The service is not yet provided by or connected to `Workspace`.
 
-All three builders:
-
-- Run enabled lookup handlers concurrently.
-- Convert lookup rows containing `value` and `label` into form select options.
-- Reject the returned promise if a lookup fails.
-
-Handler execution is currently supplied as a callback. This keeps the utility independent from Angular dependency injection and makes it reusable and testable.
-
-The agreed lookup row contract is:
-
-```ts
-{
-	value: string | number;
-	label: string;
-}
-```
-
-The label falls back to the string form of the value when needed.
-
-### Shared form improvements
-
-The generic Signal Forms component now supports the workspace drawer use case:
-
-- Configurable form title.
-- Configurable submit label.
-- Submit and cancel actions with Font Awesome icons.
-- A cancellation output.
-- Optional operator visibility.
-- Optional default values.
-- Required and readonly behavior.
-- Scrollable form content inside a fixed-height drawer.
-
-Criteria forms show their operators. Insert and update forms hide operators while retaining the internal form shape needed by the shared component.
-
-An enabled lookup that returns zero rows is a known edge case: the current template checks `option.options?.length`, so an empty lookup currently falls back to a normal input instead of rendering an empty select.
-
-### Backend seed metadata
-
-The backend organization seed has been expanded into a realistic metadata set for:
-
-- Departments.
-- Job titles.
-- Employees.
-- Projects.
-- Employee/project assignments.
-- Child relations.
-- Query, function-query, and function-data handlers.
-- Query-based and function-based lookup examples.
-
-The seed helpers create the new operation-specific lookup shape and validate the resulting metadata. The backend metadata editor still uses the previous flat lookup structure and must be updated separately.
-
-Some seeded insert and update queries currently place string and date placeholders without outer SQL quotes. This conflicts with the agreed placeholder contract and must be corrected before mutation handlers are executed.
-
-### Current verification
-
-As of this update:
-
-- The Angular development build passes.
-- The backend TypeScript no-emit check passes.
-- The frontend working tree was clean after the latest form and workspace commit.
-- The backend has an uncommitted Prisma initialization migration replacement that should be reviewed before it is committed or discarded.
-
-## Current flow
-
-The implemented menu and workspace flow is:
+### Agreed operation flows
 
 ```text
-Backend menu endpoint
-  -> MenuLoader
-  -> parameter transformer
-  -> runtime menu tree
-  -> selected menu item
-  -> Workspace
-  -> metadata-derived empty grid and workspace form drawer
-  -> criteria, insert, or update form options
-  -> lookup handlers through HandlerRunner
-  -> rendered generic form
+Retrieve success -> update rows
+Retrieve failure -> store error and stop
+
+Insert success -> clear insert data -> retrieve
+Insert failure -> store error -> reopen populated insert form
+
+Update success -> clear update data and selection -> retrieve
+Update failure -> store error -> reopen populated update form
+
+Delete success -> clear selection -> retrieve
+Delete failure -> store error and stop
 ```
 
-The query infrastructure is also ready:
+Retrieve can start from menu selection, criteria submission, refresh, or a successful mutation. It should use saved criteria, request the criteria drawer when required criteria are missing, and otherwise run the select handler. Filter always opens the criteria drawer and reloads saved values when present.
 
-```text
-Runtime handler
-  -> HandlerRunner
-  -> placeholder substitution when required
-  -> QueryRunner
-  -> backend query endpoint
-  -> HandlerResult
-```
+The UI should derive visibility from computed service state. Event handlers should update state or start a flow rather than imperatively coordinating unrelated UI elements.
 
-The form drawer is now connected to the handler infrastructure for lookup loading. The next integration boundary is converting a submitted `FormResult` into the correct handler context and executing the selected operation.
+### UI details completed
+
+- The layout allows AG Grid to fill the available height.
+- Explicit grid inputs refresh columns when the menu item changes.
+- The earlier drawer focus/`aria-hidden` warning was removed.
+- Font Awesome icons replaced custom menu-button spans.
+- The multiple-select placeholder is vertically centered in the customized 44px control.
+
+## Current verification
+
+- The Angular production build passes.
+- The backend TypeScript check passes.
+- Both repositories were clean when this document was updated.
+- The Angular build still reports the existing initial-bundle budget warning and Day.js CommonJS warning.
 
 ## Important project constraints
 
 ### Change scope
 
-- Prefer minimal, careful, incremental changes.
-- Keep implementations straightforward while the architecture is still taking shape.
-- Discuss changes first when they introduce significant complexity.
-- Ask for approval before broad refactors, new dependencies, schema changes, migrations, destructive data operations, or major architectural decisions.
-- Preserve unrelated work already present in either repository.
+- Make minimal, careful, incremental changes.
+- Keep implementation straightforward while the architecture develops.
+- Discuss complexity before introducing it.
+- Ask approval before broad refactors, dependencies, schema changes, migrations, destructive operations, or major architecture changes.
+- Preserve unrelated user work.
 
-### Angular and TypeScript
+### Angular, TypeScript, and accessibility
 
-- Keep strict TypeScript types and avoid `any`.
-- Use standalone Angular components; Angular 22 treats them as the default.
-- Use signals for component state and `computed()` for derived state.
-- Use `input()` and `output()` rather than decorator-based inputs and outputs.
-- Use `inject()` rather than constructor injection.
-- Keep templates simple and use native Angular control flow.
-- Prefer Signal Forms for new form work.
-- Keep components small and focused.
+- Use strict TypeScript and avoid `any`.
+- Use standalone components, signals, `computed()`, `input()`, `output()`, and `inject()`.
+- Prefer Signal Forms and native template control flow.
+- Keep components and services focused.
+- Keep workspace state component-scoped so future tabs can have independent instances.
+- Meet WCAG AA and pass AXE checks.
+- Preserve visible focus and never hide a focused element from assistive technology.
+- Give icon-only buttons accessible names.
+- Drawer focus entry and restoration still need implementation.
 
-### Accessibility
+### Shared metadata contract
 
-- New UI must pass AXE checks and meet WCAG AA requirements.
-- Preserve visible keyboard focus.
-- Do not hide a focused element or one of its ancestors from assistive technology.
-- Icon-only buttons need clear accessible labels.
-- Loading, failure, empty, and disabled states must be understandable without relying only on color.
+A contract change may require coordinated updates across backend models, validation, transformer, seeds, metadata editor, frontend models, transformer, utilities, forms, grid, and consumers. Inspect both repositories for impact, but edit only the repository explicitly in scope.
 
-### Shared metadata contracts
+### Trusted execution and query ownership
 
-The frontend and backend contain matching copies or representations of the metadata contract. A contract change may require coordinated updates to:
-
-- Backend persisted models.
-- Backend runtime models.
-- Backend validation schemas.
-- Backend transformer.
-- Backend seed and example data.
-- Backend metadata authoring UI.
-- Frontend persisted models.
-- Frontend runtime models.
-- Frontend transformer.
-- Frontend utilities and consumers.
-
-Changes should be checked across both repositories before being considered complete.
-
-### Trusted internal execution model
-
-The current design assumes a trusted internal application:
-
-- Metadata-defined functions are compiled in the browser.
-- Query strings are constructed by the client.
-- The backend executes the submitted query.
-
-This is an explicit trust boundary, not a general public-application security model. Authorization, access control, metadata trust, and query execution restrictions must be addressed before the system is exposed beyond its intended trusted environment.
-
-### Query ownership
+The current design assumes a trusted internal application: metadata functions execute in the browser, the client constructs queries, and the backend executes submitted SQL.
 
 - The client substitutes values only.
-- Metadata query authors own operators, quoting context, and SQL structure.
-- Metadata queries must include outer SQL quotes where their placeholders represent strings, dates, date-times, or times.
-- String apostrophes are escaped during substitution.
-- SQL Server boolean and null representations are already defined.
-- Missing placeholders and empty-array semantics remain open decisions.
-
-### Data safety
-
-- Do not reset or reseed an existing database without explicit approval.
-- Existing metadata may still use the old lookup shape and will need either a migration or an approved safe reseed.
-- Review the pending Prisma migration replacement before committing, applying, or removing it.
-- Never place database credentials or other secrets in documentation or client code.
+- Metadata owns operators, SQL structure, and outer quoting.
+- Authorization, metadata trust, and query restrictions are required before broader exposure.
+- Empty arrays, unresolved placeholders, missing values, and nullable quoted placeholders need decisions.
+- Never reset or reseed a database without explicit approval.
+- Never place secrets in client code or documentation.
 
 ## Clear next steps
 
-### 1. Align the seeded SQL with the placeholder contract
+### 1. Connect `WorkspaceService` to `Workspace`
 
-Before executing insert or update handlers, correct the seed examples so their SQL owns all required outer quoting.
+- Provide it at workspace-component level.
+- Initialize it when the `menuItem` input changes.
+- Replace only state that already has a direct service equivalent.
+- Derive the visible drawer from `WorkspaceService.drawer`.
+- Keep async form-option loading in the component initially.
 
-For example, text and date placeholders need query-authored quotes:
+This should be a wiring step, not a broad rewrite of `Workspace`, `Form`, or form models.
 
-```sql
-VALUES ('@{department_name}', '@{location}', @{annual_budget})
-```
+### 2. Define pure form-result context converters
 
-This review should cover:
+`FormResult` stores `{ operator, value, valueTo }` for each column. Before executing handlers, define small converters for retrieve criteria, insert values, and update values combined with selected-row primary keys.
 
-- Strings.
-- Dates, date-times, and times.
-- Nullable values, because quoting a placeholder that resolves to `NULL` would produce `'NULL'`.
-- Arrays used in `IN` or `NOT IN` clauses.
-- Function-query handlers that combine direct JavaScript values and placeholders.
+Do not pass complete `FormParams` objects directly to placeholder replacement. Decide criteria behavior for optional empty values, range operators, `in`/`notIn`, multiple lookup values, missing values, and empty arrays.
 
-The nullable case needs a deliberate rule before applying a mechanical update. A query that must support both a quoted value and SQL `NULL` may need to be generated by a function-query handler instead of a simple static query.
+### 3. Implement retrieval only
 
-### 2. Finish adopting the lookup contract in the backend
+- Start retrieval when the menu item initializes.
+- Let computed state request required criteria.
+- Save submitted criteria.
+- Execute the select handler through `HandlerRunner`.
+- Store successful rows or the retrieval error.
+- Feed service rows into `createGridOptions`.
+- Make Refresh reuse saved criteria.
+- Make Filter reopen saved criteria.
+- Add loading, error, and empty states.
 
-Before relying heavily on lookups, complete the backend authoring path:
+Keep insert, update, and delete execution out of this step.
 
-- Update the backend parameters editor to support separate `criteria`, `insert`, `update`, and `grid` lookup configurations.
-- Decide how existing stored metadata using the old lookup shape will be handled.
-- Validate a complete exported menu containing each lookup variation.
-- Confirm that the frontend transformer produces the expected runtime handlers from that response.
-- Review and settle the pending Prisma initialization migration replacement.
+### 4. Wire selection and permissions
 
-This step prevents new metadata from being authored in an outdated format.
-
-### 3. Define form-result-to-handler-context conversion
-
-The shared form returns this structure for each column:
-
-```ts
-{
-	operator,
-	value,
-	valueTo,
-}
-```
-
-`HandlerRunner` currently expects a flat `HandlerInput`. Before executing forms, define small, explicit converters for:
-
-- Criteria results, where operators and range values affect the query.
-- Insert results, where handlers normally need the submitted value for each column.
-- Update results, where submitted values must be combined with primary-key values from the selected row.
-
-The criteria conversion needs agreed behavior for:
-
-- Empty optional fields.
-- `between` and `notBetween`.
-- Multiple lookup values.
-- `in` and `notIn`.
-- Missing values.
-- Empty arrays.
-- Operator-specific SQL generation.
-
-Avoid passing the complete `FormParams` object directly to placeholder replacement because placeholders currently serialize scalar values and arrays, not `{ operator, value, valueTo }` objects.
-
-### 4. Execute the selected item's retrieval handler
-
-When the criteria form is submitted:
-
-- Convert the form result into the value context expected by placeholder substitution.
-- Run the selected item's select handler through `HandlerRunner`.
-- Reject or report unresolved placeholders before sending invalid SQL.
-- Store successful rows in workspace state.
-- Recreate or update the grid options with the returned rows.
-- Show useful loading, error, empty, and success states.
-
-The exact handling of ranges, multiple values, missing values, and empty arrays should be agreed before completing this step.
-
-### 5. Implement grid lookups
-
-Columns with an enabled `lookup.grid` handler need display formatting:
-
-- Run each required grid lookup handler.
-- Convert its rows into a value-to-label map.
-- Add the map to the corresponding AG Grid value formatter.
-- Preserve the raw value in row data.
-- Define behavior for missing lookup values and failed grid lookups.
-
-This should be added to the grid options utility without coupling that pure mapping function directly to Angular services.
-
-### 6. Wire refresh, permissions, and selection behavior
-
-After retrieval works:
-
-- Make Refresh repeat the latest retrieval.
-- Track the selected grid row.
-- Enable Edit and Delete only when their metadata action is enabled and a valid row is selected.
-- Enable Insert only when insertion is configured.
+- Store AG Grid selection in `selectedRow`.
+- Drive toolbar enabled states from `possibilities`.
+- Enable actions only when metadata, permissions, and selection allow them.
 - Load update defaults from the selected row.
-- Preserve accessible disabled states and labels.
+- Correct Refresh so it starts retrieval rather than opening criteria.
 
-The workspace should also reset or reload an open form drawer when the selected menu item changes. At present, selecting another item can leave form options from the previous item visible.
-
-### 7. Resolve remaining form and drawer edge cases
-
-Before relying on the drawer for mutations:
-
-- Render an empty select when an enabled lookup returns no rows instead of falling back to a normal input.
-- Move focus into the dialog when it opens.
-- Restore focus to the opening button when it closes.
-- Prevent stale asynchronous lookup results from replacing the options for a newer drawer request.
-- Decide whether closing and reopening a form should preserve or reset entered values.
-- Confirm that form submission cannot trigger native page navigation.
-
-### 8. Implement mutations one operation at a time
+### 5. Implement mutations separately
 
 Recommended order:
 
 1. Insert.
 2. Update.
-3. Delete.
+3. Delete with an accessible confirmation.
 
-For each operation:
+Follow the agreed success and failure transitions exactly and verify each operation before starting the next.
 
-- Build and validate the appropriate form or confirmation state.
-- Construct the handler context.
-- Execute the metadata handler through `HandlerRunner`.
-- Display backend failures clearly.
-- Refresh the grid only after success.
+### 6. Implement grid lookups
 
-Delete should include an accessible confirmation step.
+Run enabled grid lookups outside the pure grid mapper, convert them to value-label maps, preserve raw row values, and use the maps in value formatters. Define missing-value and lookup-failure behavior.
 
-### 9. Add children and dependent behavior later
+### 7. Resolve remaining form and drawer edge cases
 
-Child handlers and `dependsOn`-style lookup dependencies should remain deferred until the main retrieve, insert, update, and delete flows are stable.
+- Render an empty select when an enabled lookup returns no rows.
+- Move focus into the drawer and restore it on close.
+- Prevent stale lookup promises from replacing newer options.
+- Decide whether reopened forms preserve values.
+- Ensure submission cannot trigger native navigation.
 
-When implemented, dependency handling will need:
+### 8. Add focused tests
 
-- An explicit source-field model.
-- Lookup reloading rules.
-- Cancellation or stale-result protection.
-- Clear behavior when a parent value is cleared.
+Prioritize placeholder replacement, handler dispatch, form-option mapping, code-language mapping, the code `equals` invariant, context conversion, lookup conversion, grid formatting, menu-item column changes, and workspace retrieve-flow decisions.
 
-### 10. Add focused tests
+### 9. Production hardening later
 
-The most valuable early tests are for the pure contract and transformation boundaries:
-
-- Query placeholder substitution for every supported value type.
-- Runtime handler dispatch and error normalization.
-- Criteria, insert, and update form option mapping.
-- Form-result-to-handler-context conversion.
-- Lookup row conversion.
-- Grid column and value formatting.
-- Backend-to-frontend transformation of a representative menu item.
-
-UI tests can then cover drawer focus, workspace loading states, form submission, and toolbar enablement.
-
-### 11. Harden configuration and production behavior
-
-Before production readiness:
-
-- Move API URLs into environment configuration or a shared API configuration service.
-- Resolve the current production bundle budget issue.
+- Move API URLs into environment configuration.
+- Resolve bundle and Day.js warnings.
 - Define authentication and authorization.
-- Restrict backend query execution appropriately.
-- Review the browser function-compilation trust model and Content Security Policy.
-- Define user-safe error messages without exposing sensitive backend details.
-- Decide behavior for malformed lookup rows, duplicate lookup values, unresolved placeholders, and empty arrays.
+- Restrict query execution.
+- Review browser function compilation and CSP.
+- Define safe error reporting and unresolved-placeholder behavior.
 
 ## Immediate recommended task
 
-The smallest useful next step is to settle two contracts before wiring retrieval:
-
-1. How `FormResult` becomes a flat handler context for criteria, insert, and update.
-2. How query metadata handles quoting when a value may also be `NULL`.
-
-After those decisions, implement a pure criteria-result converter and connect only the retrieval handler. Keep row loading, loading/error states, and grid updates within the workspace, while leaving insert, update, and delete execution for later focused changes.
-
-In parallel or immediately afterward, update the backend metadata editor to the new lookup structure so newly authored metadata cannot revert to the old contract.
+Connect `WorkspaceService` to `Workspace` without executing handlers yet. Initialize it from the menu-item input and derive the visible drawer from its computed state. This establishes the declarative foundation for implementing retrieval in the following small step.
