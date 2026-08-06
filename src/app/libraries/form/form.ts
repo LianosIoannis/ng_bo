@@ -1,6 +1,7 @@
 import {
 	Component,
 	computed,
+	debounced,
 	effect,
 	Injector,
 	inject,
@@ -10,12 +11,10 @@ import {
 	signal,
 	untracked,
 } from "@angular/core";
-import { toObservable, toSignal } from "@angular/core/rxjs-interop";
 import { disabled, type Field, type FieldTree, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { NgxSpinnerComponent, NgxSpinnerService } from "ngx-spinner";
-import { debounceTime, distinctUntilChanged } from "rxjs";
 import type {
 	FormInputOption,
 	FormModel,
@@ -142,20 +141,14 @@ export class Form implements OnInit {
 			return Object.fromEntries(dependencyNames.map((name) => [name, model[name]?.value ?? null]));
 		});
 
-		const debouncedDependencyContext = toSignal(
-			toObservable(dependencyContext, { injector: this.injector }).pipe(
-				debounceTime(250),
-				distinctUntilChanged((previous, current) => JSON.stringify(previous) === JSON.stringify(current)),
-			),
-			{
-				initialValue: dependencyContext(),
-				injector: this.injector,
-			},
-		);
+		const debouncedDependencyContext = debounced(dependencyContext, 250, {
+			injector: this.injector,
+			equal: (previous, current) => JSON.stringify(previous) === JSON.stringify(current),
+		});
 
 		effect(
 			() => {
-				debouncedDependencyContext();
+				debouncedDependencyContext.value();
 
 				untracked(() => {
 					void this.loadLookupOptions(lookupOptions, this.createHandlerContext());
