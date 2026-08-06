@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from "@angular/core";
+import { Component, computed, input, signal } from "@angular/core";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faFilter, faPenToSquare, faPlus, faRotateRight, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { GridOptions } from "ag-grid-community";
@@ -7,7 +7,6 @@ import { Form } from "../libraries/form/form";
 import type { FormInputOption, FormResult } from "../models/form.models";
 import type { MenuItemModel } from "../models/menu-item.model";
 import type { Row, RuntimeMenuItemParams } from "../models/menu-item-params.runtime.models";
-import { HandlerRunner } from "../services/handler-runner";
 import { createCriteriaFormOptions, createInsertFormOptions, createUpdateFormOptions } from "../utils/form-options";
 import { createGridOptions } from "../utils/grid-options";
 
@@ -23,8 +22,6 @@ type FormDrawerMode = "insert" | "criteria" | "update";
 	},
 })
 export class Workspace {
-	handlerRunner = inject(HandlerRunner);
-
 	menuItem = input.required<MenuItemModel>();
 
 	insertIcon = faPlus;
@@ -42,17 +39,17 @@ export class Workspace {
 		insert: {
 			title: "Insert row",
 			submit: "Insert",
-			formOptions: (params: RuntimeMenuItemParams) => createInsertFormOptions(params, this.handlerRunner.run),
+			formOptions: (params: RuntimeMenuItemParams) => createInsertFormOptions(params),
 		},
 		criteria: {
 			title: "Retrieval criteria",
 			submit: "Retrieve",
-			formOptions: (params: RuntimeMenuItemParams) => createCriteriaFormOptions(params, this.handlerRunner.run),
+			formOptions: (params: RuntimeMenuItemParams) => createCriteriaFormOptions(params),
 		},
 		update: {
 			title: "Update row",
 			submit: "Update",
-			formOptions: (params: RuntimeMenuItemParams) => createUpdateFormOptions(params, this.handlerRunner.run),
+			formOptions: (params: RuntimeMenuItemParams) => createUpdateFormOptions(params),
 		},
 	};
 

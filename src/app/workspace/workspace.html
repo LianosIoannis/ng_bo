@@ -59,7 +59,7 @@
     <div class="m-4 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
       {{ error }}
     </div>
-    } @else if (formOptions().length) {
+    } @else if (formDrawerMode() && formOptions().length) {
     <app-form [formTitle]="formTitle()" [inputOptions]="formOptions()" [submitLabel]="formSubmitLabel()"
       (formResult)="submitForm($event)" (cancelled)="closeFormDrawer()" />
     } @else {

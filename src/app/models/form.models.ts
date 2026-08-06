@@ -1,4 +1,5 @@
 import type { CodeLanguage, Operator } from "./menu-item-params.models";
+import type { RuntimeHandler } from "./menu-item-params.runtime.models";
 
 export type SelectOptionValue = string | number;
 export type SelectValueResult = SelectOptionValue | SelectOptionValue[] | null;
@@ -32,6 +33,7 @@ export type FormInputOption = {
 	readonly?: boolean;
 	options?: SelectOption[];
 	multiple?: boolean;
+	lookupHandler?: RuntimeHandler;
 };
 
 export type FormResult = Record<string, FormParams>;

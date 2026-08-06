@@ -2,8 +2,10 @@ import { Component, Injector, inject, input, type OnInit, output, signal } from 
 import { disabled, type Field, type FieldTree, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
-import type { FormInputOption, FormModel, FormResult, SelectOption, SelectValueResult } from "../../models/form.models";
+import type { FormInputOption, FormModel, FormResult, SelectOption, SelectOptionValue, SelectValueResult } from "../../models/form.models";
 import type { Operator } from "../../models/menu-item-params.models";
+import type { Row } from "../../models/menu-item-params.runtime.models";
+import { HandlerRunner } from "../../services/handler-runner";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
 import { FormInput } from "./form-input/form-input";
@@ -19,6 +21,7 @@ import { FormSelect } from "./form-select/form-select";
 })
 export class Form implements OnInit {
 	injector = inject(Injector);
+	handlerRunner = inject(HandlerRunner);
 
 	inputOptions = input.required<FormInputOption[]>();
 	formTitle = input("Form");
@@ -30,6 +33,9 @@ export class Form implements OnInit {
 	cancelIcon = faXmark;
 
 	operatorOptionsMap = new Map<string, SelectOption[]>();
+	lookupOptionsMap = signal<Record<string, SelectOption[]>>({});
+	lookupOptionsLoading = signal(false);
+	lookupOptionsError = signal("");
 
 	formModel = signal<FormModel>({});
 
@@ -76,6 +82,47 @@ export class Form implements OnInit {
 			},
 			{ injector: this.injector },
 		);
+
+		this.loadLookupOptions(inputOptions);
+	}
+
+	async loadLookupOptions(inputOptions: FormInputOption[]): Promise<void> {
+		const lookupOptions = inputOptions.filter((option) => option.lookupHandler);
+
+		if (lookupOptions.length === 0) {
+			return;
+		}
+
+		this.lookupOptionsLoading.set(true);
+		this.lookupOptionsError.set("");
+
+		try {
+			const entries = await Promise.all(
+				lookupOptions.map(async (option) => {
+					if (!option.lookupHandler) {
+						return [option.name, []] as const;
+					}
+
+					const result = await this.handlerRunner.run(option.lookupHandler);
+
+					if (!result.success) {
+						throw new Error(`Lookup failed for "${option.name}": ${result.error}`);
+					}
+
+					return [option.name, result.data.map(toSelectOption)] as const;
+				}),
+			);
+
+			this.lookupOptionsMap.set(Object.fromEntries(entries));
+		} catch (error) {
+			this.lookupOptionsError.set(error instanceof Error ? error.message : String(error));
+		} finally {
+			this.lookupOptionsLoading.set(false);
+		}
+	}
+
+	selectOptions(option: FormInputOption): SelectOption[] {
+		return option.lookupHandler ? (this.lookupOptionsMap()[option.name] ?? []) : (option.options ?? []);
 	}
 
 	isRangeOperator(operator: Operator): boolean {
@@ -138,4 +185,14 @@ export class Form implements OnInit {
 	cancelForm(): void {
 		this.cancelled.emit();
 	}
+}
+
+function toSelectOption(row: Row): SelectOption {
+	const value = row["value"] as SelectOptionValue;
+	const label = row["label"];
+
+	return {
+		value,
+		label: label === null || label === undefined ? String(value) : String(label),
+	};
 }

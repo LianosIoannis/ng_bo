@@ -5,7 +5,8 @@
 
     <div class="flex items-center gap-1" role="group" aria-label="Form actions">
       <button type="submit"
-        class="inline-flex min-h-8 items-center gap-2 rounded-md px-3 text-sm font-medium text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
+        class="inline-flex min-h-8 items-center gap-2 rounded-md px-3 text-sm font-medium text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="lookupOptionsLoading() || !!lookupOptionsError()">
         <fa-icon [icon]="submitIcon" aria-hidden="true"></fa-icon>
         <span>{{ submitLabel() }}</span>
       </button>
@@ -20,6 +21,15 @@
   </header>
 
   <div class="min-h-0 flex-1 overflow-y-auto p-4">
+    @if (lookupOptionsLoading()) {
+      <p class="flex min-h-32 items-center justify-center text-sm text-slate-600" role="status">
+        Loading options…
+      </p>
+    } @else if (lookupOptionsError(); as error) {
+      <p class="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
+        {{ error }}
+      </p>
+    } @else {
     <div class="grid gap-4">
       @for (option of inputOptions(); track option.name) {
         <div class="grid gap-2">
@@ -50,8 +60,8 @@
                 }
 
                 @default {
-                  @if (option.options?.length) {
-                  <form-select [formField]="selectValueField(option)" [options]="option.options"
+                  @if (option.lookupHandler || option.options !== undefined) {
+                  <form-select [formField]="selectValueField(option)" [options]="selectOptions(option)"
                     [multiple]="option.multiple ?? false" />
                   } @else {
                   <form-input [formField]="inputValueField(option)" [type]="inputType(option)" />
@@ -63,5 +73,6 @@
         </div>
       }
     </div>
+    }
   </div>
 </form>
