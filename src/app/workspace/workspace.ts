@@ -1,4 +1,4 @@
-import { Component, computed, input, signal } from "@angular/core";
+import { Component, computed, effect, input, signal } from "@angular/core";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faFilter, faPenToSquare, faPlus, faRotateRight, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { GridOptions } from "ag-grid-community";
@@ -34,6 +34,11 @@ export class Workspace {
 	formOptions = signal<FormInputOption[]>([]);
 	formOptionsLoading = signal(false);
 	formOptionsError = signal<string>("");
+
+	closeFormDrawerEffect = effect(() => {
+		const _ = this.menuItem();
+		this.formDrawerMode.set(null);
+	});
 
 	metaData = {
 		insert: {

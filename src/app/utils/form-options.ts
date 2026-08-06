@@ -22,6 +22,7 @@ export function createCriteriaFormOptions(params: RuntimeMenuItemParams): FormIn
 				? {
 						multiple: lookup.multiple,
 						lookupHandler: lookup.handler,
+						lookupDependsOn: lookup.dependsOn,
 					}
 				: {}),
 		};
@@ -36,10 +37,7 @@ export function createUpdateFormOptions(params: RuntimeMenuItemParams): FormInpu
 	return createOperationFormOptions(params, "update");
 }
 
-function createOperationFormOptions(
-	params: RuntimeMenuItemParams,
-	operation: "insert" | "update",
-): FormInputOption[] {
+function createOperationFormOptions(params: RuntimeMenuItemParams, operation: "insert" | "update"): FormInputOption[] {
 	const columns = params.columns.filter((column) => column[operation].enabled);
 
 	return columns.map((column): FormInputOption => {
@@ -58,6 +56,7 @@ function createOperationFormOptions(
 				? {
 						multiple: lookup.multiple,
 						lookupHandler: lookup.handler,
+						lookupDependsOn: lookup.dependsOn,
 					}
 				: {}),
 		};

@@ -1,10 +1,31 @@
-import { Component, Injector, inject, input, type OnInit, output, signal } from "@angular/core";
+import {
+	Component,
+	computed,
+	effect,
+	Injector,
+	inject,
+	input,
+	type OnInit,
+	output,
+	signal,
+	untracked,
+} from "@angular/core";
+import { toObservable, toSignal } from "@angular/core/rxjs-interop";
 import { disabled, type Field, type FieldTree, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
-import type { FormInputOption, FormModel, FormResult, SelectOption, SelectOptionValue, SelectValueResult } from "../../models/form.models";
+import { NgxSpinnerComponent, NgxSpinnerService } from "ngx-spinner";
+import { debounceTime, distinctUntilChanged } from "rxjs";
+import type {
+	FormInputOption,
+	FormModel,
+	FormResult,
+	SelectOption,
+	SelectOptionValue,
+	SelectValueResult,
+} from "../../models/form.models";
 import type { Operator } from "../../models/menu-item-params.models";
-import type { Row } from "../../models/menu-item-params.runtime.models";
+import type { HandlerInput, Row } from "../../models/menu-item-params.runtime.models";
 import { HandlerRunner } from "../../services/handler-runner";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
@@ -13,7 +34,7 @@ import { FormSelect } from "./form-select/form-select";
 
 @Component({
 	selector: "app-form",
-	imports: [FormRoot, FormField, FormSelect, FormInput, FormCheckbox, FormEditor, FaIconComponent],
+	imports: [FormRoot, FormField, FormSelect, FormInput, FormCheckbox, FormEditor, FaIconComponent, NgxSpinnerComponent],
 	templateUrl: "./form.html",
 	host: {
 		class: "block h-full min-h-0",
@@ -22,6 +43,7 @@ import { FormSelect } from "./form-select/form-select";
 export class Form implements OnInit {
 	injector = inject(Injector);
 	handlerRunner = inject(HandlerRunner);
+	spinnerService = inject(NgxSpinnerService);
 
 	inputOptions = input.required<FormInputOption[]>();
 	formTitle = input("Form");
@@ -31,6 +53,7 @@ export class Form implements OnInit {
 
 	submitIcon = faCheck;
 	cancelIcon = faXmark;
+	spinnerName = "form-options";
 
 	operatorOptionsMap = new Map<string, SelectOption[]>();
 	lookupOptionsMap = signal<Record<string, SelectOption[]>>({});
@@ -40,6 +63,7 @@ export class Form implements OnInit {
 	formModel = signal<FormModel>({});
 
 	optionsForm!: FieldTree<FormModel>;
+	private lookupGeneration = 0;
 
 	ngOnInit(): void {
 		const inputOptions = this.inputOptions();
@@ -83,27 +107,78 @@ export class Form implements OnInit {
 			{ injector: this.injector },
 		);
 
-		this.loadLookupOptions(inputOptions);
+		this.initializeLookupOptions(inputOptions);
+
+		effect(
+			(onCleanup) => {
+				if (!this.lookupOptionsLoading()) {
+					return;
+				}
+
+				void this.spinnerService.show(this.spinnerName);
+				onCleanup(() => void this.spinnerService.hide(this.spinnerName));
+			},
+			{ injector: this.injector },
+		);
 	}
 
-	async loadLookupOptions(inputOptions: FormInputOption[]): Promise<void> {
+	private initializeLookupOptions(inputOptions: FormInputOption[]): void {
 		const lookupOptions = inputOptions.filter((option) => option.lookupHandler);
 
 		if (lookupOptions.length === 0) {
 			return;
 		}
 
+		const dependencyNames = [...new Set(lookupOptions.flatMap((option) => option.lookupDependsOn ?? []))];
+
+		if (dependencyNames.length === 0) {
+			void this.loadLookupOptions(lookupOptions, this.createHandlerContext());
+			return;
+		}
+
+		const dependencyContext = computed(() => {
+			const model = this.formModel();
+
+			return Object.fromEntries(dependencyNames.map((name) => [name, model[name]?.value ?? null]));
+		});
+
+		const debouncedDependencyContext = toSignal(
+			toObservable(dependencyContext, { injector: this.injector }).pipe(
+				debounceTime(250),
+				distinctUntilChanged((previous, current) => JSON.stringify(previous) === JSON.stringify(current)),
+			),
+			{
+				initialValue: dependencyContext(),
+				injector: this.injector,
+			},
+		);
+
+		effect(
+			() => {
+				debouncedDependencyContext();
+
+				untracked(() => {
+					void this.loadLookupOptions(lookupOptions, this.createHandlerContext());
+				});
+			},
+			{ injector: this.injector },
+		);
+	}
+
+	private async loadLookupOptions(inputOptions: FormInputOption[], context: HandlerInput): Promise<void> {
+		const generation = ++this.lookupGeneration;
+
 		this.lookupOptionsLoading.set(true);
 		this.lookupOptionsError.set("");
 
 		try {
 			const entries = await Promise.all(
-				lookupOptions.map(async (option) => {
-					if (!option.lookupHandler) {
+				inputOptions.map(async (option) => {
+					if (!option.lookupHandler || !this.lookupDependenciesReady(option, context)) {
 						return [option.name, []] as const;
 					}
 
-					const result = await this.handlerRunner.run(option.lookupHandler);
+					const result = await this.handlerRunner.run(option.lookupHandler, context);
 
 					if (!result.success) {
 						throw new Error(`Lookup failed for "${option.name}": ${result.error}`);
@@ -113,12 +188,66 @@ export class Form implements OnInit {
 				}),
 			);
 
-			this.lookupOptionsMap.set(Object.fromEntries(entries));
+			if (generation !== this.lookupGeneration) {
+				return;
+			}
+
+			const optionsMap = Object.fromEntries(entries);
+			this.lookupOptionsMap.set(optionsMap);
+			this.removeInvalidLookupValues(inputOptions, optionsMap);
 		} catch (error) {
+			if (generation !== this.lookupGeneration) {
+				return;
+			}
+
 			this.lookupOptionsError.set(error instanceof Error ? error.message : String(error));
 		} finally {
-			this.lookupOptionsLoading.set(false);
+			if (generation === this.lookupGeneration) {
+				this.lookupOptionsLoading.set(false);
+			}
 		}
+	}
+
+	private createHandlerContext(): HandlerInput {
+		return Object.fromEntries(Object.entries(this.formModel()).map(([name, params]) => [name, params.value]));
+	}
+
+	private lookupDependenciesReady(option: FormInputOption, context: HandlerInput): boolean {
+		return (option.lookupDependsOn ?? []).every((name) => hasValue(context[name]));
+	}
+
+	private removeInvalidLookupValues(inputOptions: FormInputOption[], optionsMap: Record<string, SelectOption[]>): void {
+		this.formModel.update((model) => {
+			let updatedModel = model;
+
+			for (const option of inputOptions) {
+				const field = model[option.name];
+				const validValues = new Set(optionsMap[option.name].map(({ value }) => value));
+				const currentValue = field.value;
+				const value = Array.isArray(currentValue)
+					? currentValue.filter(
+							(item): item is SelectOptionValue =>
+								(typeof item === "string" || typeof item === "number") && validValues.has(item),
+						)
+					: (typeof currentValue === "string" || typeof currentValue === "number") && validValues.has(currentValue)
+						? currentValue
+						: null;
+
+				if (sameValue(currentValue, value)) {
+					continue;
+				}
+
+				updatedModel = {
+					...updatedModel,
+					[option.name]: {
+						...field,
+						value,
+					},
+				};
+			}
+
+			return updatedModel;
+		});
 	}
 
 	selectOptions(option: FormInputOption): SelectOption[] {
@@ -185,6 +314,18 @@ export class Form implements OnInit {
 	cancelForm(): void {
 		this.cancelled.emit();
 	}
+}
+
+function hasValue(value: unknown): boolean {
+	return value !== null && value !== undefined && value !== "" && (!Array.isArray(value) || value.length > 0);
+}
+
+function sameValue(previous: FormModel[string]["value"], current: FormModel[string]["value"]): boolean {
+	if (!Array.isArray(previous) || !Array.isArray(current)) {
+		return previous === current;
+	}
+
+	return previous.length === current.length && previous.every((value, index) => value === current[index]);
 }
 
 function toSelectOption(row: Row): SelectOption {

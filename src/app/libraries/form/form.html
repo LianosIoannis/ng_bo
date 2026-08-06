@@ -20,16 +20,19 @@
     </div>
   </header>
 
-  <div class="min-h-0 flex-1 overflow-y-auto p-4">
-    @if (lookupOptionsLoading()) {
-      <p class="flex min-h-32 items-center justify-center text-sm text-slate-600" role="status">
-        Loading options…
-      </p>
-    } @else if (lookupOptionsError(); as error) {
+  <div class="relative grid min-h-0 flex-1 content-start gap-4 overflow-y-auto p-4"
+    [attr.aria-busy]="lookupOptionsLoading()">
+    <ngx-spinner [name]="spinnerName" [fullScreen]="false" [disableAnimation]="true" type="ball-clip-rotate" size="small" color="#0369a1"
+      bdColor="rgba(255, 255, 255, 0.75)">
+      <p class="text-sm text-slate-700" role="status">Loading options…</p>
+    </ngx-spinner>
+
+    @if (lookupOptionsError(); as error) {
       <p class="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
         {{ error }}
       </p>
-    } @else {
+    }
+
     <div class="grid gap-4">
       @for (option of inputOptions(); track option.name) {
         <div class="grid gap-2">
@@ -73,6 +76,5 @@
         </div>
       }
     </div>
-    }
   </div>
 </form>

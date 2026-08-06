@@ -34,6 +34,7 @@ export type FormInputOption = {
 	options?: SelectOption[];
 	multiple?: boolean;
 	lookupHandler?: RuntimeHandler;
+	lookupDependsOn?: string[];
 };
 
 export type FormResult = Record<string, FormParams>;
