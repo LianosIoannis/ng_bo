@@ -1,8 +1,8 @@
-import { Component, computed, input, linkedSignal, output } from "@angular/core";
-import { disabled, type Field, FormField, FormRoot, form, required } from "@angular/forms/signals";
+import { Component, Injector, inject, input, type OnInit, output, signal } from "@angular/core";
+import { disabled, type Field, type FieldTree, FormField, FormRoot, form, required } from "@angular/forms/signals";
 import { FaIconComponent } from "@fortawesome/angular-fontawesome";
 import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
-import type { FormInputOption, FormModel, FormResult, SelectValueResult } from "../../models/form.models";
+import type { FormInputOption, FormModel, FormResult, SelectOption, SelectValueResult } from "../../models/form.models";
 import type { Operator } from "../../models/menu-item-params.models";
 import { FormCheckbox } from "./form-checkbox/form-checkbox";
 import { FormEditor } from "./form-editor/form-editor";
@@ -17,55 +17,66 @@ import { FormSelect } from "./form-select/form-select";
 		class: "block h-full min-h-0",
 	},
 })
-export class Form {
-	inputOptions = input<FormInputOption[]>([]);
+export class Form implements OnInit {
+	injector = inject(Injector);
+
+	inputOptions = input.required<FormInputOption[]>();
 	formTitle = input("Form");
-	submitLabel = input<string>("Submit");
+	submitLabel = input("Submit");
 	formResult = output<FormResult>();
 	cancelled = output<void>();
 
 	submitIcon = faCheck;
 	cancelIcon = faXmark;
 
-	operatorOptionsMap = computed(() => {
-		return this.inputOptions().map((option) => ({
-			name: option.name,
-			operators: option.operators.map((operator) => ({
-				label: operator as string,
-				value: operator,
-			})),
-		}));
-	});
+	operatorOptionsMap = new Map<string, SelectOption[]>();
 
-	formModel = linkedSignal(() => {
+	formModel = signal<FormModel>({});
+
+	optionsForm!: FieldTree<FormModel>;
+
+	ngOnInit(): void {
+		const inputOptions = this.inputOptions();
 		const model: FormModel = {};
 
-		for (const option of this.inputOptions()) {
+		for (const option of inputOptions) {
 			model[option.name] = {
-				operator: option.defaultOperator ?? option.operators?.[0] ?? ("equals" as Operator),
+				operator: option.defaultOperator ?? option.operators[0] ?? "equals",
 				value: option.defaultValue ?? (option.multiple ? [] : null),
 				valueTo: null,
 			};
+
+			this.operatorOptionsMap.set(
+				option.name,
+				option.operators.map((operator) => ({
+					label: operator,
+					value: operator,
+				})),
+			);
 		}
 
-		return model;
-	});
+		this.formModel.set(model);
 
-	optionsForm = form(this.formModel, (path) => {
-		for (const option of this.inputOptions()) {
-			const field = path[option.name];
+		this.optionsForm = form(
+			this.formModel,
+			(path) => {
+				for (const option of inputOptions) {
+					const field = path[option.name];
 
-			if (option.required) {
-				required(field.value);
-			}
+					if (option.required) {
+						required(field.value);
+					}
 
-			if (option.readonly) {
-				disabled(field.value);
-				disabled(field.operator);
-				disabled(field.valueTo);
-			}
-		}
-	});
+					if (option.readonly) {
+						disabled(field.value);
+						disabled(field.operator);
+						disabled(field.valueTo);
+					}
+				}
+			},
+			{ injector: this.injector },
+		);
+	}
 
 	isRangeOperator(operator: Operator): boolean {
 		return operator === "between" || operator === "notBetween";
@@ -111,12 +122,17 @@ export class Form {
 	}
 
 	operatorOptions(option: FormInputOption) {
-		return this.operatorOptionsMap().find((item) => item.name === option.name)?.operators ?? [];
+		return this.operatorOptionsMap.get(option.name) ?? [];
 	}
 
 	submitForm(): void {
-		const result = this.formModel();
-		this.formResult.emit(result);
+		this.optionsForm().markAsTouched();
+
+		if (!this.optionsForm().valid()) {
+			return;
+		}
+
+		this.formResult.emit(this.formModel());
 	}
 
 	cancelForm(): void {

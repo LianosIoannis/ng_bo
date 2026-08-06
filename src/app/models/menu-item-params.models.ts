@@ -30,6 +30,7 @@ export type Handler = {
 type LookupConfig = {
 	enabled: boolean;
 	multiple: boolean;
+	dependsOn: string[];
 	handler: Handler;
 };
 
@@ -37,7 +38,7 @@ type ColumnLookupParams = {
 	criteria: LookupConfig;
 	insert: LookupConfig;
 	update: LookupConfig;
-	grid: Omit<LookupConfig, "multiple">;
+	grid: Omit<LookupConfig, "multiple" | "dependsOn">;
 };
 
 type ColumnParams = {

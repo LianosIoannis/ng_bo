@@ -33,6 +33,7 @@ export type RuntimeHandler =
 type RuntimeLookupConfig = {
 	enabled: boolean;
 	multiple: boolean;
+	dependsOn: string[];
 	handler: RuntimeHandler;
 };
 
@@ -40,7 +41,7 @@ type RuntimeColumnLookupParams = {
 	criteria: RuntimeLookupConfig;
 	insert: RuntimeLookupConfig;
 	update: RuntimeLookupConfig;
-	grid: Omit<RuntimeLookupConfig, "multiple">;
+	grid: Omit<RuntimeLookupConfig, "multiple" | "dependsOn">;
 };
 
 export type RuntimeColumnParams = {
