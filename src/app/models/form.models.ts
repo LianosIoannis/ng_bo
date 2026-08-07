@@ -29,6 +29,7 @@ export type FormInputOption = {
 	defaultOperator?: Operator;
 	showOperator?: boolean;
 	defaultValue?: FieldTypeScalar | FieldTypeScalar[];
+	defaultValueTo?: FieldTypeScalar;
 	required?: boolean;
 	readonly?: boolean;
 	options?: SelectOption[];

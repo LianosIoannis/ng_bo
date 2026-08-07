@@ -72,7 +72,7 @@ export class Form implements OnInit {
 			model[option.name] = {
 				operator: option.defaultOperator ?? option.operators[0] ?? "equals",
 				value: option.defaultValue ?? (option.multiple ? [] : null),
-				valueTo: null,
+				valueTo: option.defaultValueTo ?? null,
 			};
 
 			this.operatorOptionsMap.set(

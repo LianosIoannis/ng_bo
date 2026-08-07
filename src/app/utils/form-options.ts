@@ -2,7 +2,10 @@ import type { FormInputOption, FormResult } from "../models/form.models";
 import type { ColumnType } from "../models/menu-item-params.models";
 import type { Row, RuntimeMenuItemParams } from "../models/menu-item-params.runtime.models";
 
-export function createCriteriaFormOptions(params: RuntimeMenuItemParams): FormInputOption[] {
+export function createCriteriaFormOptions(
+	params: RuntimeMenuItemParams,
+	formData: FormResult | null = null,
+): FormInputOption[] {
 	const criteriaColumns = params.columns.filter(
 		(column) => column.retrieve.enabled && column.retrieve.criteria.enabled,
 	);
@@ -10,6 +13,7 @@ export function createCriteriaFormOptions(params: RuntimeMenuItemParams): FormIn
 	return criteriaColumns.map((column): FormInputOption => {
 		const lookup = column.lookup.criteria;
 		const isCode = column.type === "code";
+		const submittedParams = formData?.[column.name];
 
 		return {
 			name: column.name,
@@ -17,7 +21,9 @@ export function createCriteriaFormOptions(params: RuntimeMenuItemParams): FormIn
 			type: column.type === "text" ? "string" : column.type,
 			language: column.language,
 			operators: isCode ? ["equals"] : column.retrieve.criteria.operators,
-			defaultOperator: isCode ? "equals" : column.retrieve.criteria.defaultOperator,
+			defaultOperator: isCode ? "equals" : (submittedParams?.operator ?? column.retrieve.criteria.defaultOperator),
+			defaultValue: normalizeDefaultValue(column.type, submittedParams?.value),
+			defaultValueTo: normalizeDefaultValue(column.type, submittedParams?.valueTo),
 			required: column.retrieve.criteria.required,
 			...(lookup.enabled
 				? {
@@ -79,6 +85,14 @@ function createOperationFormOptions(
 	});
 }
 
+function normalizeDefaultValue(
+	type: ColumnType,
+	value: FormInputOption["defaultValueTo"],
+): FormInputOption["defaultValueTo"];
+function normalizeDefaultValue(
+	type: ColumnType,
+	value: FormInputOption["defaultValue"],
+): FormInputOption["defaultValue"];
 function normalizeDefaultValue(
 	type: ColumnType,
 	value: FormInputOption["defaultValue"],

@@ -49,7 +49,8 @@ export class Workspace {
 		criteria: {
 			title: "Retrieval criteria",
 			submit: "Retrieve",
-			formOptions: (params: RuntimeMenuItemParams) => createCriteriaFormOptions(params),
+			formOptions: (params: RuntimeMenuItemParams) =>
+				createCriteriaFormOptions(params, this.workspace.retrieveCriteria()),
 		},
 		update: {
 			title: "Update row",
