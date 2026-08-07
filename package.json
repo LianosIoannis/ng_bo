@@ -26,6 +26,7 @@
     "dayjs": "^1.11.21",
     "monaco-editor": "^0.55.1",
     "ngx-spinner": "^21.1.0",
+    "node-sql-parser": "^5.4.0",
     "rxjs": "~7.8.0",
     "sql-formatter": "^15.8.1",
     "tslib": "^2.3.0"

@@ -4,6 +4,7 @@ import type { MenuItemModel } from "../models/menu-item.model";
 import type { Row } from "../models/menu-item-params.runtime.models";
 import { HandlerRunner } from "../services/handler-runner";
 import { createMutationHandlerInput, createRetrieveHandlerInput } from "../utils/form-result";
+import { createRetrieveQuery } from "../utils/retrieve-query";
 
 export type WorkspaceFlow = "retrieve" | "filter" | "insert" | "update" | "delete";
 export type WorkspaceDrawer = "criteria" | "insert" | "update";
@@ -131,10 +132,27 @@ export class WorkspaceService {
 		this.retrieveLoading.set(true);
 		this.retrieveError.set(null);
 
-		const result = await this.handlerRunner.run(
-			params.handlers.select,
-			createRetrieveHandlerInput(this.retrieveCriteria()),
-		);
+		const criteria = this.retrieveCriteria();
+		const handlerInput = createRetrieveHandlerInput(criteria);
+		const selectHandler = params.handlers.select;
+		let handler = selectHandler;
+
+		try {
+			if (selectHandler.kind === "query") {
+				handler = { ...selectHandler, src: createRetrieveQuery(selectHandler.src, criteria) };
+			}
+		} catch (error) {
+			if (generation !== this.retrieveGeneration || menuItem !== this.menuItem()) {
+				return;
+			}
+
+			this.retrieveError.set(error instanceof Error ? error.message : String(error));
+			this.retrieveLoading.set(false);
+			this.activeFlow.set(null);
+			return;
+		}
+
+		const result = await this.handlerRunner.run(handler, selectHandler.kind === "query" ? {} : handlerInput);
 
 		if (generation !== this.retrieveGeneration || menuItem !== this.menuItem()) {
 			return;

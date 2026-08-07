@@ -8,7 +8,7 @@ export class QueryRunner {
 	private http = inject(HttpClient);
 	private apiUrl = "http://localhost:3000/api/query";
 
-	historyResults: HandlerResult[] = [];
+	historyResults: { query: string; result: HandlerResult }[] = [];
 
 	private run(queryString: string) {
 		return this.http.post<HandlerResult>(this.apiUrl, { queryString });
@@ -17,15 +17,17 @@ export class QueryRunner {
 	async runQuery(queryString: string): Promise<HandlerResult> {
 		try {
 			const result = await firstValueFrom(this.run(queryString));
-			this.historyResults.push(result);
+			this.historyResults.push({ query: queryString, result });
 			return result;
 		} catch (error) {
 			const result: HandlerResult = {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			};
-			this.historyResults.push(result);
+			this.historyResults.push({ query: queryString, result });
 			return result;
+		} finally {
+			console.dir(this.historyResults);
 		}
 	}
 }
