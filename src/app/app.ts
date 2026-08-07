@@ -20,9 +20,9 @@ export class App {
 	menuLoader = inject(MenuLoader);
 
 	menuIcon = faBars;
-	menuOpen = signal(false);
+	menuOpen = signal(true);
 	selectedMenuItem = signal<MenuItemModel | null>(null);
-	
+
 	menuData = toSignal(this.menuLoader.loadMenu().pipe(catchError(() => of(null))), {
 		initialValue: undefined,
 	});

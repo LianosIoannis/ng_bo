@@ -32,11 +32,19 @@ export function createGridOptions(menuItemParams: RuntimeMenuItemParams, rowData
 function getTypeOptions(type: ColumnType): ColDef<Row> {
 	switch (type) {
 		case "date":
-			return createDateTimeOptions("DD/MM/YYYY");
+			return { cellDataType: "dateString", valueFormatter: createDateTimeOptions("DD/MM/YYYY") };
 		case "datetime":
-			return createDateTimeOptions("DD/MM/YYYY HH:mm");
+			return { cellDataType: "dateTimeString", valueFormatter: createDateTimeOptions("DD/MM/YYYY HH:mm") };
 		case "time":
-			return createDateTimeOptions("HH:mm");
+			return {
+				cellDataType: "text",
+				valueFormatter: createDateTimeOptions("HH:mm"),
+				filterValueGetter: (params) => {
+					const value = params.data?.[params.colDef.field as string] as string;
+					const parsed = dayjs(value);
+					return parsed.isValid() ? parsed.format("HH:mm") : value;
+				},
+			};
 		case "code":
 			return {
 				valueFormatter: ({ value }: ValueFormatterParams<Row>) => String(value ?? "").slice(0, 30),
@@ -46,17 +54,14 @@ function getTypeOptions(type: ColumnType): ColDef<Row> {
 	}
 }
 
-function createDateTimeOptions(format: string): ColDef<Row> {
-	return {
-		cellDataType: "dateTimeString",
-		valueFormatter: ({ value }: ValueFormatterParams<Row>) => {
-			if (value === null || value === undefined || value === "") {
-				return "";
-			}
+function createDateTimeOptions(format: string) {
+	return ({ value }: ValueFormatterParams<Row>) => {
+		if (value === null || value === undefined || value === "") {
+			return "";
+		}
 
-			const parsedValue = dayjs(value);
+		const parsedValue = dayjs(value);
 
-			return parsedValue.isValid() ? parsedValue.format(format) : String(value);
-		},
+		return parsedValue.isValid() ? parsedValue.format(format) : String(value);
 	};
 }
