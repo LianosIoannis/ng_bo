@@ -1,6 +1,6 @@
 # Project Status and Next Steps
 
-Last updated: 6 August 2026
+Last updated: 7 August 2026
 
 ## Project overview
 
@@ -72,7 +72,7 @@ Current rules are:
 - `null` becomes `NULL`.
 - Arrays become comma-separated, individually quoted values.
 
-Missing values, `undefined`, empty arrays, and nullable values inside query-authored quotes still need explicit decisions.
+For automatic static retrieval, a placeholder without a usable criterion produces a clear error. Generic placeholder behavior for `undefined`, empty arrays, and nullable values in other handler contexts still needs explicit decisions.
 
 ### Grid options
 
@@ -94,7 +94,7 @@ The shared Signal Forms component supports criteria, insert, update, range opera
 The option builders are synchronous and pure:
 
 ```ts
-createCriteriaFormOptions(params)
+createCriteriaFormOptions(params, formData)
 createInsertFormOptions(params, formData)
 createUpdateFormOptions(params, rowData, formData)
 ```
@@ -106,6 +106,7 @@ They:
 - Pass `column.language` to code editors.
 - Force code criteria to `equals`.
 - Hide operators and use `equals` internally for insert and update forms.
+- Restore saved retrieval operators, values, and range endpoints when the criteria drawer is reopened.
 - Populate update fields from the selected row and prefer saved submitted data when reopening a failed mutation.
 - Normalize date defaults for native date inputs with `value.slice(0, 10)`.
 
@@ -125,6 +126,27 @@ The Form now owns lookup execution through `HandlerRunner`:
 `debounced()` is an Angular 22 experimental API. It replaced the earlier RxJS `toObservable`/`toSignal` and `debounceTime` pipeline and should be reviewed when Angular promotes or changes the API.
 
 `createRetrieveHandlerInput(criteria)` now converts saved retrieval criteria into handler context. Non-empty values are exposed as flat properties for existing placeholders and function destructuring, while the complete `FormResult` is also available under `context.criteria` for handlers that need operators or range endpoints.
+
+### Automatic static retrieve queries
+
+`createRetrieveQuery(query, criteria)` uses the TransactSQL build of `node-sql-parser` for static `query` retrieval handlers. `function-query` and `function-data` handlers retain full responsibility for their output.
+
+The utility:
+
+- Captures placeholder names before replacement.
+- Replaces existing placeholders using the established value-substitution rules.
+- Finds submitted, non-empty criteria that were not already handled by placeholders.
+- Parses only when unused criteria need to be added.
+- Adds unused criteria to the outermost `SELECT` `WHERE`, combining them with an existing condition through `AND`.
+- Supports all current operators for `SELECT`, including comparisons, `LIKE`, ranges, and lists.
+- Supports single `EXEC` statements by adding unused criteria as named parameters.
+- Allows only `equals` and `in` for generated procedure parameters.
+- Replaces an existing procedure parameter case-insensitively or appends it when missing.
+- Serializes procedure array values as one comma-separated string using `join(",")`.
+- Escapes apostrophes, quotes generated string and date literals, and converts booleans to `1` or `0`.
+- Rejects unresolved placeholders, unsupported statements, multiple statements, unions, incomplete ranges, and incompatible value/operator shapes with clear retrieval errors.
+
+Prepared static queries run through `HandlerRunner` with an empty execution context, preventing submitted text that resembles a placeholder from being replaced a second time.
 
 ### Workspace component
 
@@ -168,6 +190,8 @@ It defines explicit signals for the menu item, rows, selected row, retrieve crit
 - Stores successful rows and exposes them to AG Grid.
 - Stores failures without removing rows already displayed by a previous successful retrieval.
 - Reuses saved criteria for Refresh.
+- Restores saved criteria, including operators and range endpoints, when Filter is reopened.
+- Automatically applies unused criteria to supported static `SELECT` and `EXEC` handlers.
 - Uses a generation counter so results from an older menu item or request cannot replace current rows.
 - Exposes `retrieveLoading` for AG Grid's native loading overlay and disables Refresh while loading.
 
@@ -212,7 +236,7 @@ The UI should derive visibility from computed service state. Event handlers shou
 ## Current verification
 
 - The Angular production build passes.
-- The Angular build still reports the existing initial-bundle budget warning and Day.js CommonJS warning.
+- The Angular build still reports the initial-bundle budget warning and CommonJS warnings for Day.js and `node-sql-parser/build/transactsql`.
 
 ## Important project constraints
 
@@ -244,8 +268,8 @@ A contract change may require coordinated updates across backend models, validat
 
 The current design assumes a trusted internal application: metadata functions execute in the browser, the client constructs queries, and the backend executes submitted SQL.
 
-- The client substitutes values only.
-- Metadata owns operators, SQL structure, and outer quoting.
+- Placeholder substitution changes values only; metadata owns its operators, SQL structure, and outer quoting.
+- For automatically generated static retrieve criteria, the client builds predicates or procedure parameters and the AST serializer owns their SQL syntax and quoting.
 - Authorization, metadata trust, and query restrictions are required before broader exposure.
 - Empty arrays, unresolved placeholders, missing values, and nullable quoted placeholders need decisions.
 - Never reset or reseed a database without explicit approval.
@@ -253,13 +277,14 @@ The current design assumes a trusted internal application: metadata functions ex
 
 ## Clear next steps
 
-### 1. Finish retrieval criteria behavior
+### 1. Verify retrieval criteria end to end
 
-- Populate the criteria form from saved criteria when Filter is reopened.
-- Add `defaultValueTo` support for saved range criteria.
-- Decide the final convention for optional empty values and unresolved placeholders.
-- Author criteria-aware select handlers as `function-query`; current static select queries intentionally ignore submitted criteria.
-- Verify required criteria and retrieval errors with real metadata.
+- Exercise automatic criteria against representative real static `SELECT` and `EXEC` handlers.
+- Verify placeholder-backed and automatically generated criteria together in the same query.
+- Verify existing procedure-parameter replacement, appended parameters, array joining, dates, booleans, and apostrophes.
+- Confirm that unsupported operators for procedures and unresolved placeholders produce useful UI errors.
+- Decide whether `%` and `_` entered in `contains`, `startsWith`, or `endsWith` should remain SQL wildcards or be escaped as literal characters.
+- Keep unions, multiple statements, and other unsupported shapes out of automatic criteria generation unless deliberately designed later.
 
 ### 2. Verify mutation metadata end to end
 
@@ -285,17 +310,17 @@ Run enabled grid lookups outside the pure grid mapper, convert them to value-lab
 
 ### 5. Add focused tests
 
-Prioritize placeholder replacement, handler dispatch, form-option mapping, code-language mapping, the code `equals` invariant, context conversion, lookup conversion, grid formatting, menu-item column changes, and workspace retrieve-flow decisions.
+Prioritize placeholder replacement, automatic `SELECT` predicates, `EXEC` parameter generation, operator/value validation, handler dispatch, form-option mapping, code-language mapping, the code `equals` invariant, context conversion, lookup conversion, grid formatting, menu-item column changes, and workspace retrieve-flow decisions.
 
 ### 6. Production hardening later
 
 - Move API URLs into environment configuration.
-- Resolve bundle and Day.js warnings.
+- Resolve bundle, Day.js, and `node-sql-parser` warnings.
 - Define authentication and authorization.
 - Restrict query execution.
 - Review browser function compilation and CSP.
-- Define safe error reporting and unresolved-placeholder behavior.
+- Review parser/configuration error presentation and unsupported-statement behavior.
 
 ## Immediate recommended task
 
-Exercise Insert and Update with real backend metadata, then fix only any contract mismatches revealed by those runs.
+Exercise automatic retrieval criteria with real static `SELECT` and `EXEC` metadata, then fix only contract mismatches revealed by those runs.

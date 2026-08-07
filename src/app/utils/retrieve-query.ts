@@ -1,4 +1,11 @@
-import { type Binary, type ExpressionValue, Parser, type Value } from "node-sql-parser/build/transactsql";
+import {
+	type AST,
+	type Binary,
+	type ExpressionValue,
+	Parser,
+	type Select,
+	type Value,
+} from "node-sql-parser/build/transactsql";
 import type { FormParams, FormResult } from "../models/form.models";
 import type { Operator } from "../models/menu-item-params.models";
 import { createRetrieveHandlerInput } from "./form-result";
@@ -28,20 +35,61 @@ export function createRetrieveQuery(query: string, criteria: FormResult | null):
 	const ast = parser.astify(replacedQuery);
 
 	if (Array.isArray(ast)) {
-		throw new Error("Automatic retrieve criteria support a single SELECT statement only.");
+		throw new Error("Automatic retrieve criteria support a single SELECT or EXEC statement only.");
 	}
 
-	if (ast.type !== "select" || ast.set_op || ast._next) {
+	if (isSelectAst(ast)) {
+		return addSelectCriteria(ast, remainingCriteria);
+	}
+
+	if (isExecAst(ast)) {
+		return addExecCriteria(ast, remainingCriteria);
+	}
+
+	throw new Error("Automatic retrieve criteria support SELECT and EXEC statements only.");
+}
+
+function addSelectCriteria(ast: Select, criteria: [string, FormParams][]): string {
+	if (ast.set_op || ast._next) {
 		throw new Error("Automatic retrieve criteria support a single SELECT statement only.");
 	}
 
 	const criteriaExpression = combineWithAnd(
-		remainingCriteria.map(([column, params]) => createCriteriaExpression(column, params)),
+		criteria.map(([column, params]) => createCriteriaExpression(column, params)),
 	);
 
 	ast.where = ast.where ? combineWithAnd([ast.where, criteriaExpression]) : criteriaExpression;
 
 	return parser.sqlify(ast);
+}
+
+function addExecCriteria(ast: ExecAst, criteria: [string, FormParams][]): string {
+	const parameters = ast.parameters ?? [];
+
+	for (const [column, params] of criteria) {
+		if (params.operator !== "equals" && params.operator !== "in") {
+			throw new Error(`Retrieve operator "${params.operator}" is not supported for stored procedure parameters.`);
+		}
+
+		const value = createExecValueExpression(params.value);
+		const existingParameter = parameters.find(
+			(parameter) => parameter.type === "variable" && parameter.name?.toLowerCase() === column.toLowerCase(),
+		);
+
+		if (existingParameter) {
+			existingParameter.value = value;
+		} else {
+			parameters.push({
+				type: "variable",
+				name: column,
+				value,
+			});
+		}
+	}
+
+	ast.parameters = parameters;
+
+	return parser.sqlify(ast as unknown as AST);
 }
 
 function findPlaceholderNames(query: string): Set<string> {
@@ -176,6 +224,10 @@ function createValueExpression(value: FormParams["valueTo"]): Value {
 	}
 }
 
+function createExecValueExpression(value: FormParams["value"]): Value {
+	return Array.isArray(value) ? createStringExpression(value.join(",")) : createValueExpression(value);
+}
+
 function createStringExpression(value: string): Value {
 	return {
 		type: "single_quote_string",
@@ -199,4 +251,27 @@ function hasValue(value: unknown): boolean {
 
 function assertNever(value: never): never {
 	throw new Error(`Unsupported retrieve operator: ${String(value)}.`);
+}
+
+type ExecParameter = {
+	type: string;
+	name?: string;
+	value?: Value;
+};
+
+type ExecAst = {
+	type: "exec";
+	parameters: ExecParameter[] | null;
+};
+
+function isSelectAst(ast: unknown): ast is Select {
+	return hasStatementType(ast, "select");
+}
+
+function isExecAst(ast: unknown): ast is ExecAst {
+	return hasStatementType(ast, "exec");
+}
+
+function hasStatementType(value: unknown, type: string): boolean {
+	return typeof value === "object" && value !== null && "type" in value && value.type === type;
 }
