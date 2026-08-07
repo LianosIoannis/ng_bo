@@ -4,6 +4,7 @@ import type { MenuItemModel } from "../models/menu-item.model";
 import type { Row } from "../models/menu-item-params.runtime.models";
 import { HandlerRunner } from "../services/handler-runner";
 import { createMutationHandlerInput, createRetrieveHandlerInput } from "../utils/form-result";
+import { createGridLookupMap, type GridLookupMaps } from "../utils/grid-lookups";
 import { createRetrieveQuery } from "../utils/retrieve-query";
 
 export type WorkspaceFlow = "retrieve" | "filter" | "insert" | "update" | "delete";
@@ -17,6 +18,7 @@ export class WorkspaceService {
 	readonly rows = signal<Row[]>([]);
 	readonly selectedRow = signal<Row | null>(null);
 	readonly retrieveLoading = signal(false);
+	readonly gridLookupLoading = signal(false);
 	readonly insertLoading = signal(false);
 	readonly updateLoading = signal(false);
 	readonly deleteLoading = signal(false);
@@ -26,12 +28,15 @@ export class WorkspaceService {
 	readonly updateData = signal<FormResult | null>(null);
 
 	readonly retrieveError = signal<string | null>(null);
+	readonly gridLookupError = signal<string | null>(null);
 	readonly insertError = signal<string | null>(null);
 	readonly updateError = signal<string | null>(null);
 	readonly deleteError = signal<string | null>(null);
 
 	readonly activeFlow = signal<WorkspaceFlow | null>(null);
+	readonly gridLookupMaps = signal<GridLookupMaps>(new Map());
 	private retrieveGeneration = 0;
+	private gridLookupGeneration = 0;
 	private operationGeneration = 0;
 
 	readonly retrieveCriteriaExist = computed(
@@ -63,7 +68,7 @@ export class WorkspaceService {
 	readonly possibilities = computed(() => {
 		const params = this.menuItem()?.params;
 		const rowSelected = this.selectedRow() !== null;
-		const busy = this.retrieveLoading() || this.mutationLoading();
+		const busy = this.retrieveLoading() || this.gridLookupLoading() || this.mutationLoading();
 
 		return {
 			retrieve: Boolean(params) && !busy,
@@ -93,11 +98,13 @@ export class WorkspaceService {
 
 	initialize(menuItem: MenuItemModel): void {
 		this.retrieveGeneration++;
+		this.gridLookupGeneration++;
 		this.operationGeneration++;
 		this.menuItem.set(menuItem);
 		this.rows.set([]);
 		this.selectedRow.set(null);
 		this.retrieveLoading.set(false);
+		this.gridLookupLoading.set(false);
 		this.insertLoading.set(false);
 		this.updateLoading.set(false);
 		this.deleteLoading.set(false);
@@ -105,12 +112,61 @@ export class WorkspaceService {
 		this.insertData.set(null);
 		this.updateData.set(null);
 		this.retrieveError.set(null);
+		this.gridLookupError.set(null);
 		this.insertError.set(null);
 		this.updateError.set(null);
 		this.deleteError.set(null);
+		this.gridLookupMaps.set(new Map());
 		this.activeFlow.set("retrieve");
 
-		void this.retrieve();
+		void this.reload();
+	}
+
+	async loadGridLookups(): Promise<void> {
+		const menuItem = this.menuItem();
+		const lookupColumns = menuItem?.params?.columns.filter((column) => column.lookup.grid.enabled) ?? [];
+		const generation = ++this.gridLookupGeneration;
+
+		this.gridLookupError.set(null);
+
+		if (lookupColumns.length === 0) {
+			this.gridLookupMaps.set(new Map());
+			this.gridLookupLoading.set(false);
+			return;
+		}
+
+		this.gridLookupLoading.set(true);
+
+		try {
+			const entries = await Promise.all(
+				lookupColumns.map(async (column) => {
+					const result = await this.handlerRunner.run(column.lookup.grid.handler);
+
+					if (!result.success) {
+						throw new Error(`Grid lookup failed for "${column.label}": ${result.error}`);
+					}
+
+					return [column.name, createGridLookupMap(result.data)] as const;
+				}),
+			);
+
+			if (generation !== this.gridLookupGeneration || menuItem !== this.menuItem()) {
+				return;
+			}
+
+			this.gridLookupMaps.set(new Map(entries));
+		} catch (error) {
+			if (generation !== this.gridLookupGeneration || menuItem !== this.menuItem()) {
+				return;
+			}
+
+			this.gridLookupMaps.set(new Map());
+			this.gridLookupError.set(error instanceof Error ? error.message : String(error));
+		} finally {
+			if (generation === this.gridLookupGeneration && menuItem === this.menuItem()) {
+				this.gridLookupLoading.set(false);
+			}
+		}
 	}
 
 	async retrieve(): Promise<void> {
@@ -231,7 +287,7 @@ export class WorkspaceService {
 
 		this.insertData.set(null);
 		this.activeFlow.set("retrieve");
-		await this.retrieve();
+		await this.reload();
 	}
 
 	async submitUpdate(data: FormResult): Promise<void> {
@@ -265,7 +321,7 @@ export class WorkspaceService {
 		this.updateData.set(null);
 		this.selectedRow.set(null);
 		this.activeFlow.set("retrieve");
-		await this.retrieve();
+		await this.reload();
 	}
 
 	startDelete(): void {
@@ -308,17 +364,21 @@ export class WorkspaceService {
 
 		this.selectedRow.set(null);
 		this.activeFlow.set("retrieve");
-		await this.retrieve();
+		await this.reload();
 	}
 
 	refresh(): void {
 		this.activeFlow.set("retrieve");
-		void this.retrieve();
+		void this.reload();
 	}
 
 	cancelFlow(): void {
 		if (!this.mutationLoading()) {
 			this.activeFlow.set(null);
 		}
+	}
+
+	private async reload(): Promise<void> {
+		await Promise.all([this.retrieve(), this.loadGridLookups()]);
 	}
 }

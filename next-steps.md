@@ -76,7 +76,7 @@ For automatic static retrieval, a placeholder without a usable criterion produce
 
 ### Grid options
 
-`createGridOptions(params, rowData)` maps runtime metadata and rows into AG Grid options. It currently supports visibility, sorting, filtering, pagination, single-row selection, content-based sizing, and these formatters:
+`createGridOptions(params, rowData, gridLookupMaps)` maps runtime metadata, rows, and loaded lookup maps into AG Grid options. It currently supports visibility, sorting, filtering, pagination, single-row selection, content-based sizing, and these formatters:
 
 - Date: `DD/MM/YYYY`.
 - Date-time: `DD/MM/YYYY HH:mm`.
@@ -85,7 +85,9 @@ For automatic static retrieval, a placeholder without a usable criterion produce
 
 Date, date-time, and time columns use AG Grid's `dateTimeString` cell data type.
 
-The AG Grid wrapper binds `columnDefs` and `rowData` explicitly in addition to `gridOptions`. This ensures that changing the selected menu item refreshes the displayed columns and rows. Grid lookup formatting is not implemented yet.
+Enabled grid lookups preserve the raw row value while displaying its label through `valueFormatter`. Their `filterValueGetter` also returns the label, and filterable lookup columns explicitly use AG Grid's text filter. Missing lookup entries fall back to the raw value, while `null` and `undefined` display as empty strings. Lookup matching is type-sensitive, and duplicate lookup values use the last returned label.
+
+The AG Grid wrapper binds `columnDefs` and `rowData` explicitly in addition to `gridOptions`. This ensures that changing the selected menu item, retrieved rows, or loaded lookup maps refreshes the displayed columns and values.
 
 ### Generic forms and option builders
 
@@ -175,7 +177,7 @@ The workspace receives a required `MenuItemModel` and contains:
 
 It is not root-provided because each future tab/workspace must own an independent state instance. `Workspace` now provides and injects it.
 
-It defines explicit signals for the menu item, rows, selected row, retrieve criteria, insert data, update data, operation-specific errors, and active flow. Computed state determines:
+It defines explicit signals for the menu item, rows, selected row, retrieve criteria, insert data, update data, grid lookup maps, operation-specific loading and errors, and active flow. Computed state determines:
 
 - Whether criteria and required criteria exist.
 - Whether insert and update fields exist.
@@ -194,6 +196,8 @@ It defines explicit signals for the menu item, rows, selected row, retrieve crit
 - Automatically applies unused criteria to supported static `SELECT` and `EXEC` handlers.
 - Uses a generation counter so results from an older menu item or request cannot replace current rows.
 - Exposes `retrieveLoading` for AG Grid's native loading overlay and disables Refresh while loading.
+
+Grid lookup handlers run concurrently through `HandlerRunner` and are converted into per-column value-label maps outside the pure grid mapper. They load on workspace initialization, explicit Refresh, and successful mutations. A separate generation counter prevents stale lookup results from updating another menu item. Lookup loading participates in the grid loading overlay and toolbar availability. If any lookup handler fails, the batch stores a visible error, clears the maps, and leaves the grid usable with raw values.
 
 Delete uses the selected row as handler context. It requires explicit confirmation, blocks dismissal while running, clears selection and retrieves fresh rows on success, and stores the delete error without refreshing on failure. Its operation generation prevents a response from an older workspace item from changing current state.
 
@@ -236,6 +240,7 @@ The UI should derive visibility from computed service state. Event handlers shou
 ## Current verification
 
 - The Angular production build passes.
+- A focused grid-options check confirms that both cell formatting and filtering return the lookup label while the row retains its raw value and the column uses `agTextColumnFilter`.
 - The Angular build still reports the initial-bundle budget warning and CommonJS warnings for Day.js and `node-sql-parser/build/transactsql`.
 
 ## Important project constraints
@@ -293,9 +298,14 @@ The current design assumes a trusted internal application: metadata functions ex
 - Verify failed handlers reopen populated forms and successful handlers refresh the grid.
 - Decide whether mutation success feedback is needed beyond the refreshed table.
 
-### 3. Implement grid lookups
+### 3. Verify and refine grid lookups
 
-Run enabled grid lookups outside the pure grid mapper, convert them to value-label maps, preserve raw row values, and use the maps in value formatters. Define missing-value and lookup-failure behavior.
+- Exercise multiple real grid lookup handlers, including numeric and string values.
+- Confirm displayed labels and text filtering against real backend results.
+- Verify raw values remain available for selection, update, and delete handlers.
+- Confirm failed lookup batches show raw values and a useful workspace error.
+- Decide whether grid sorting should continue using raw values or sort by displayed labels.
+- Decide whether partial lookup success should be retained if one column's lookup fails.
 
 ### 4. Resolve remaining form and drawer edge cases
 
@@ -310,7 +320,7 @@ Run enabled grid lookups outside the pure grid mapper, convert them to value-lab
 
 ### 5. Add focused tests
 
-Prioritize placeholder replacement, automatic `SELECT` predicates, `EXEC` parameter generation, operator/value validation, handler dispatch, form-option mapping, code-language mapping, the code `equals` invariant, context conversion, lookup conversion, grid formatting, menu-item column changes, and workspace retrieve-flow decisions.
+Prioritize placeholder replacement, automatic `SELECT` predicates, `EXEC` parameter generation, operator/value validation, handler dispatch, form-option mapping, code-language mapping, the code `equals` invariant, context conversion, grid lookup conversion, label formatting and filtering, lookup failure fallback, stale lookup protection, menu-item column changes, and workspace retrieve-flow decisions.
 
 ### 6. Production hardening later
 
@@ -323,4 +333,4 @@ Prioritize placeholder replacement, automatic `SELECT` predicates, `EXEC` parame
 
 ## Immediate recommended task
 
-Exercise automatic retrieval criteria with real static `SELECT` and `EXEC` metadata, then fix only contract mismatches revealed by those runs.
+Exercise grid lookup display and filtering with real backend metadata, then fix only contract mismatches revealed by those runs.

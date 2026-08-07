@@ -79,7 +79,8 @@ export class Workspace {
 			this.workspace.insertError() ??
 			this.workspace.updateError() ??
 			this.workspace.deleteError() ??
-			this.workspace.retrieveError(),
+			this.workspace.retrieveError() ??
+			this.workspace.gridLookupError(),
 	);
 	deleteMessage = computed(() => `Delete the selected row from ${this.menuItem().params?.tableName ?? "this table"}?`);
 
@@ -87,8 +88,12 @@ export class Workspace {
 		const params = this.menuItem().params;
 		return params
 			? {
-					...createGridOptions(params, this.workspace.rows()),
-					loading: this.workspace.retrieveLoading() || this.workspace.insertLoading() || this.workspace.updateLoading(),
+					...createGridOptions(params, this.workspace.rows(), this.workspace.gridLookupMaps()),
+					loading:
+						this.workspace.retrieveLoading() ||
+						this.workspace.gridLookupLoading() ||
+						this.workspace.insertLoading() ||
+						this.workspace.updateLoading(),
 				}
 			: { columnDefs: [], rowData: [] };
 	});

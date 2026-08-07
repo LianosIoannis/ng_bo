@@ -49,7 +49,7 @@
   }
 
   <section class="min-h-0 flex-1" aria-label="Table" [attr.inert]="interactionBlocked() ? '' : null"
-    [attr.aria-busy]="workspace.retrieveLoading() || workspace.insertLoading() || workspace.updateLoading()">
+    [attr.aria-busy]="workspace.retrieveLoading() || workspace.gridLookupLoading() || workspace.insertLoading() || workspace.updateLoading()">
     <agtable [gridOptions]="gridOptions()" (selectionChanged)="selectRow($event)" />
   </section>
 

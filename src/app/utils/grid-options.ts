@@ -1,19 +1,31 @@
-import type { ColDef, GridOptions, ValueFormatterParams } from "ag-grid-community";
+import type { ColDef, GridOptions, ValueFormatterParams, ValueGetterParams } from "ag-grid-community";
 import { themeAlpine } from "ag-grid-community";
 import dayjs from "dayjs";
 import type { ColumnType } from "../models/menu-item-params.models";
 import type { Row, RuntimeMenuItemParams } from "../models/menu-item-params.runtime.models";
+import type { GridLookupMap, GridLookupMaps, GridLookupValue } from "./grid-lookups";
 
-export function createGridOptions(menuItemParams: RuntimeMenuItemParams, rowData: Row[]): GridOptions<Row> {
+const emptyGridLookup: GridLookupMap = new Map();
+
+export function createGridOptions(
+	menuItemParams: RuntimeMenuItemParams,
+	rowData: Row[],
+	gridLookupMaps: GridLookupMaps = new Map(),
+): GridOptions<Row> {
 	return {
-		columnDefs: menuItemParams.columns.map((column) => ({
-			field: column.name,
-			headerName: column.label,
-			hide: !column.visible,
-			sortable: column.sortable,
-			filter: column.filterable,
-			...getTypeOptions(column.type),
-		})),
+		columnDefs: menuItemParams.columns.map((column) => {
+			const gridLookup = column.lookup.grid.enabled ? (gridLookupMaps.get(column.name) ?? emptyGridLookup) : null;
+
+			return {
+				field: column.name,
+				headerName: column.label,
+				hide: !column.visible,
+				sortable: column.sortable,
+				filter: gridLookup && column.filterable ? "agTextColumnFilter" : column.filterable,
+				...getTypeOptions(column.type),
+				...(gridLookup ? getGridLookupOptions(column.name, gridLookup) : {}),
+			};
+		}),
 		rowData,
 		theme: themeAlpine,
 		suppressCellFocus: true,
@@ -27,6 +39,25 @@ export function createGridOptions(menuItemParams: RuntimeMenuItemParams, rowData
 			checkboxes: false,
 		},
 	};
+}
+
+function getGridLookupOptions(columnName: string, lookup: GridLookupMap): ColDef<Row> {
+	return {
+		valueFormatter: ({ value }: ValueFormatterParams<Row>) => formatGridLookupValue(value, lookup),
+		filterValueGetter: ({ data }: ValueGetterParams<Row>) => formatGridLookupValue(data?.[columnName], lookup),
+	};
+}
+
+function formatGridLookupValue(value: unknown, lookup: GridLookupMap): string {
+	if (value === null || value === undefined) {
+		return "";
+	}
+
+	return isGridLookupValue(value) ? (lookup.get(value) ?? String(value)) : String(value);
+}
+
+function isGridLookupValue(value: unknown): value is GridLookupValue {
+	return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
 }
 
 function getTypeOptions(type: ColumnType): ColDef<Row> {
